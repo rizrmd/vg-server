@@ -10,6 +10,9 @@ SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:$
 
 mkdir -p "${SPACETIME_DATA_DIR}"
 
+# Clean up stale PID file from previous crashes
+rm -f "${SPACETIME_DATA_DIR}/spacetime.pid"
+
 spacetime start \
   --listen-addr "${SPACETIME_LISTEN_ADDR}" \
   --data-dir "${SPACETIME_DATA_DIR}" \
