@@ -5,7 +5,7 @@ SPACETIME_HOST="${SPACETIME_HOST:-127.0.0.1}"
 SPACETIME_PORT="${SPACETIME_PORT:-3000}"
 SPACETIME_LISTEN_ADDR="${SPACETIME_LISTEN_ADDR:-0.0.0.0:${SPACETIME_PORT}}"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
-SPACETIME_DB_NAME="vg-server-20260310"
+SPACETIME_DB_NAME="vg-server-$(date +%Y%m%d%H%M%S)"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:${SPACETIME_PORT}}"
 
 mkdir -p "${SPACETIME_DATA_DIR}"
@@ -58,28 +58,14 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "${SPACETIME_DELETE_DATA_ON_START:-0}" == "1" ]]; then
-  DELETE_FLAG="--delete-data=always"
-else
-  DELETE_FLAG=""
-fi
-
-if [[ -n "${DELETE_FLAG}" ]]; then
-  spacetime publish "${SPACETIME_DB_NAME}" \
-    --server "${SPACETIME_PUBLISH_SERVER}" \
-    --module-path /app/spacetimedb \
-    --anonymous \
-    --yes \
-    --no-config \
-    ${DELETE_FLAG}
-else
-  spacetime publish "${SPACETIME_DB_NAME}" \
-    --server "${SPACETIME_PUBLISH_SERVER}" \
-    --module-path /app/spacetimedb \
-    --anonymous \
-    --yes \
-    --no-config
-fi
+# Use --create-only to avoid conflicts with existing databases owned by others
+spacetime publish "${SPACETIME_DB_NAME}" \
+  --server "${SPACETIME_PUBLISH_SERVER}" \
+  --module-path /app/spacetimedb \
+  --anonymous \
+  --yes \
+  --no-config \
+  --create-only
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
