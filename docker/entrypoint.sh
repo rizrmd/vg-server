@@ -59,14 +59,14 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
 fi
 
 # Publish the module to the embedded SpacetimeDB server
+# Don't use --clear-database to preserve database identity across restarts
 echo "Publishing module to ${SPACETIME_DB_NAME}..."
 spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
   --yes \
-  --no-config \
-  --clear-database
+  --no-config
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
