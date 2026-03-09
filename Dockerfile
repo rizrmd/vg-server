@@ -1,7 +1,5 @@
 FROM rust:1.94-bookworm
 
-ARG SPACETIME_VERSION=2.0.2
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CARGO_HOME=/usr/local/cargo
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -23,7 +21,7 @@ RUN apt-get update \
 
 RUN rustup target add wasm32-unknown-unknown
 
-RUN curl -fsSL https://install.spacetimedb.com | bash -s -- --version "${SPACETIME_VERSION}"
+RUN curl -fsSL https://install.spacetimedb.com | bash -s -- --yes
 
 WORKDIR /app
 
