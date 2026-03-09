@@ -65,7 +65,8 @@ spacetime publish "${SPACETIME_DB_NAME}" \
   --module-path /app/spacetimedb \
   --anonymous \
   --yes \
-  --no-config
+  --no-config \
+  --clear-database
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
