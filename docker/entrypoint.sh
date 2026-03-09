@@ -5,7 +5,7 @@ SPACETIME_HOST="${SPACETIME_HOST:-127.0.0.1}"
 SPACETIME_PORT="${SPACETIME_PORT:-3000}"
 SPACETIME_LISTEN_ADDR="${SPACETIME_LISTEN_ADDR:-0.0.0.0:${SPACETIME_PORT}}"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
-SPACETIME_DB_NAME="vg-server-$(date +%Y%m%d%H%M%S)"
+SPACETIME_DB_NAME="vg-server"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:${SPACETIME_PORT}}"
 
 mkdir -p "${SPACETIME_DATA_DIR}"
@@ -58,21 +58,14 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Publish the module (will create new database or update if owned by this identity)
+# Publish the module to the embedded SpacetimeDB server
 echo "Publishing module to ${SPACETIME_DB_NAME}..."
-if spacetime publish "${SPACETIME_DB_NAME}" \
+spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
   --yes \
-  --no-config 2>&1 | tee /tmp/publish.log; then
-  echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
-  echo "Published database: ${SPACETIME_DB_NAME}"
-else
-  echo "Publish failed, check logs above"
-  cat /tmp/publish.log
-  exit 1
-fi
+  --no-config
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
