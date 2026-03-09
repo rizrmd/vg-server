@@ -61,12 +61,13 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Publish the module
+# Publish the module (clear database to allow fresh deployments)
 echo "Publishing module: ${SPACETIME_DB_NAME}..."
 if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
+  --clear-database \
   --yes \
   --no-config; then
   echo "Failed to publish module" >&2
