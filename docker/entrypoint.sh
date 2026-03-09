@@ -7,8 +7,13 @@ SPACETIME_LISTEN_ADDR="${SPACETIME_LISTEN_ADDR:-0.0.0.0:${SPACETIME_PORT}}"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
 SPACETIME_DB_NAME="vg-server"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:${SPACETIME_PORT}}"
+SPACETIME_CONFIG_DIR="${SPACETIME_DATA_DIR}/.spacetime-cli"
 
 mkdir -p "${SPACETIME_DATA_DIR}"
+mkdir -p "${SPACETIME_CONFIG_DIR}"
+
+# Set SpacetimeDB CLI config directory to persist identity across restarts
+export SPACETIME_CONFIG_DIR="${SPACETIME_CONFIG_DIR}"
 
 # Clean up stale lock files from previous crashes/redeployments
 # This handles the case where Coolify starts new container before stopping old one
@@ -58,15 +63,17 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Publish the module to the embedded SpacetimeDB server
-# Don't use --clear-database to preserve database identity across restarts
+# Publish the module (identity is persisted in SPACETIME_CONFIG_DIR)
 echo "Publishing module to ${SPACETIME_DB_NAME}..."
-spacetime publish "${SPACETIME_DB_NAME}" \
+if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
   --yes \
-  --no-config
+  --no-config; then
+  echo "Failed to publish module" >&2
+  exit 1
+fi
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
