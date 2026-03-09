@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SPACETIME_HOST="${SPACETIME_HOST:-127.0.0.1}"
-SPACETIME_PORT="${SPACETIME_PORT:-3000}"
-SPACETIME_LISTEN_ADDR="${SPACETIME_LISTEN_ADDR:-0.0.0.0:${SPACETIME_PORT}}"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
-SPACETIME_DB_NAME="vg-server"
-SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:${SPACETIME_PORT}}"
+SPACETIME_DB_NAME="${SPACETIME_DB_NAME:-vg-server}"
+SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://127.0.0.1:3000}"
 SPACETIME_CONFIG_DIR="${SPACETIME_DATA_DIR}/.spacetime-cli"
 
 mkdir -p "${SPACETIME_DATA_DIR}"
@@ -16,7 +13,6 @@ mkdir -p "${SPACETIME_CONFIG_DIR}"
 export SPACETIME_CONFIG_DIR="${SPACETIME_CONFIG_DIR}"
 
 # Clean up stale lock files from previous crashes/redeployments
-# This handles the case where Coolify starts new container before stopping old one
 if [ -f "${SPACETIME_DATA_DIR}/spacetime.pid" ]; then
   OLD_PID=$(cat "${SPACETIME_DATA_DIR}/spacetime.pid" 2>/dev/null || echo "")
   if [ -n "$OLD_PID" ] && ! kill -0 "$OLD_PID" 2>/dev/null; then
@@ -35,8 +31,9 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+# Start SpacetimeDB server (official image has it built-in)
 spacetime start \
-  --listen-addr "${SPACETIME_LISTEN_ADDR}" \
+  --listen-addr '0.0.0.0:3000' \
   --data-dir "${SPACETIME_DATA_DIR}" \
   --non-interactive &
 
@@ -51,6 +48,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# Wait for server to be healthy
 for _ in $(seq 1 60); do
   if curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
     break
@@ -63,8 +61,8 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Publish the module (identity is persisted in SPACETIME_CONFIG_DIR)
-echo "Publishing module to ${SPACETIME_DB_NAME}..."
+# Publish the module
+echo "Publishing module: ${SPACETIME_DB_NAME}..."
 if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
@@ -75,7 +73,7 @@ if ! spacetime publish "${SPACETIME_DB_NAME}" \
   exit 1
 fi
 
-echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
-echo "Published database: ${SPACETIME_DB_NAME}"
+echo "SpacetimeDB ready at ${SPACETIME_PUBLISH_SERVER}"
+echo "Database: ${SPACETIME_DB_NAME}"
 
 wait "${SPACETIME_PID}"
