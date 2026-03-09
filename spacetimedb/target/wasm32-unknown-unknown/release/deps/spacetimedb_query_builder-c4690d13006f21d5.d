@@ -1,0 +1,10 @@
+/home/riz/vg-server/spacetimedb/target/wasm32-unknown-unknown/release/deps/spacetimedb_query_builder-c4690d13006f21d5.d: /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/lib.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/expr.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/join.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/table.rs
+
+/home/riz/vg-server/spacetimedb/target/wasm32-unknown-unknown/release/deps/libspacetimedb_query_builder-c4690d13006f21d5.rlib: /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/lib.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/expr.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/join.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/table.rs
+
+/home/riz/vg-server/spacetimedb/target/wasm32-unknown-unknown/release/deps/libspacetimedb_query_builder-c4690d13006f21d5.rmeta: /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/lib.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/expr.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/join.rs /home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/table.rs
+
+/home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/lib.rs:
+/home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/expr.rs:
+/home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/join.rs:
+/home/riz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spacetimedb-query-builder-2.0.3/src/table.rs:
