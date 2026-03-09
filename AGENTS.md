@@ -91,6 +91,38 @@ spacetime logs <db-name>
 - When publishing to maincloud the database dashboard will be at the url: https://spacetimedb.com/@<username>/<database-name>
 - The database owner can view utilization and performance metrics on the dashboard
 
+### Coolify Deployment For This Repo
+
+- Coolify app uuid: `nw8g4co0skk488ss000k44ok`
+- Coolify project uuid: `sws0ckk`
+- Git branch used by Coolify: `master`
+- Trigger a redeploy from the host with:
+
+```bash
+docker exec coolify php artisan tinker --execute='$app = App\\Models\\Application::where("uuid", "nw8g4co0skk488ss000k44ok")->firstOrFail(); $uuid = (string) new Visus\\Cuid2\\Cuid2(); $result = queue_application_deployment($app, $uuid, 0, "HEAD", false, false, false, false, null, true); var_export($result);'
+```
+
+- Check the latest deployment status with:
+
+```bash
+docker exec coolify-db psql -U coolify -d coolify -At -F $'\t' -c "SELECT id, deployment_uuid, status, created_at, finished_at FROM application_deployment_queues WHERE application_id='133' ORDER BY id DESC LIMIT 5;"
+```
+
+- Check the latest deployment logs with:
+
+```bash
+docker exec coolify-db psql -U coolify -d coolify -At -F $'\t' -c "SELECT id, deployment_uuid, status, logs FROM application_deployment_queues WHERE application_id='133' ORDER BY id DESC LIMIT 1;"
+```
+
+- Check whether the app container is running with:
+
+```bash
+docker ps --filter 'label=coolify.applicationId=133' --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+- Do not re-add the `triarc-slice` submodule to this repo unless Coolify also has access to that private repository. It previously broke deployment during submodule checkout.
+- The Docker image must use `curl -fsSL https://install.spacetimedb.com | bash -s -- --yes`. The installer no longer accepts the old `--version` argument form.
+
 ---
 
 ## Debugging Checklist
