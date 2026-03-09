@@ -10,8 +10,25 @@ SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://${SPACETIME_HOST}:$
 
 mkdir -p "${SPACETIME_DATA_DIR}"
 
-# Clean up stale PID file from previous crashes
-rm -f "${SPACETIME_DATA_DIR}/spacetime.pid"
+# Clean up stale lock files from previous crashes/redeployments
+# This handles the case where Coolify starts new container before stopping old one
+if [ -f "${SPACETIME_DATA_DIR}/spacetime.pid" ]; then
+  OLD_PID=$(cat "${SPACETIME_DATA_DIR}/spacetime.pid" 2>/dev/null || echo "")
+  if [ -n "$OLD_PID" ] && ! kill -0 "$OLD_PID" 2>/dev/null; then
+    echo "Removing stale PID file (process $OLD_PID no longer exists)"
+    rm -f "${SPACETIME_DATA_DIR}/spacetime.pid"
+  fi
+fi
+
+# Wait for control-db lock to be released (max 30 seconds)
+CONTROL_DB_LOCK="${SPACETIME_DATA_DIR}/control-db/db.lock"
+for i in $(seq 1 30); do
+  if ! [ -f "$CONTROL_DB_LOCK" ] || flock -n "$CONTROL_DB_LOCK" -c "exit 0" 2>/dev/null; then
+    break
+  fi
+  echo "Waiting for control-db lock... ($i/30)"
+  sleep 1
+done
 
 spacetime start \
   --listen-addr "${SPACETIME_LISTEN_ADDR}" \
