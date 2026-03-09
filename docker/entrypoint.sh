@@ -27,13 +27,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 for _ in $(seq 1 60); do
-  if curl -fsS "${SPACETIME_PUBLISH_SERVER}/health" >/dev/null 2>&1; then
+  if curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/health" >/dev/null 2>&1; then
+if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   echo "SpacetimeDB failed to start at ${SPACETIME_PUBLISH_SERVER}" >&2
   exit 1
 fi
