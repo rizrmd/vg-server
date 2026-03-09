@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Force database name to vg-server (ignore Coolify env var)
+SPACETIME_DB_NAME="vg-server"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
-SPACETIME_DB_NAME="${SPACETIME_DB_NAME:-vg-server}"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://127.0.0.1:3000}"
 SPACETIME_CONFIG_DIR="${SPACETIME_DATA_DIR}/.spacetime-cli"
 
@@ -61,14 +62,19 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Publish the module (clear database to allow fresh deployments)
+# Delete old database if it exists (ignoring errors)
+echo "Cleaning up old database..."
+spacetime database delete "${SPACETIME_DB_NAME}" \
+  --server "${SPACETIME_PUBLISH_SERVER}" \
+  --yes 2>/dev/null || true
+
+# Publish the module fresh
 echo "SPACETIME_DB_NAME=${SPACETIME_DB_NAME}"
 echo "Publishing module: ${SPACETIME_DB_NAME}..."
 if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
-  --clear-database \
   --yes \
   --no-config; then
   echo "Failed to publish module" >&2

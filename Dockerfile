@@ -3,7 +3,6 @@ FROM clockworklabs/spacetimedb:latest
 ENV SPACETIME_DATA_DIR=/var/lib/spacetimedb
 ENV SPACETIME_LISTEN_ADDR=0.0.0.0:3000
 ENV SPACETIME_DB_NAME=vg-server
-ENV SPACETIME_CLEAR_DATABASE=true
 
 WORKDIR /app
 
