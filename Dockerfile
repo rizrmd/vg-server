@@ -28,8 +28,8 @@ WORKDIR /app
 COPY spacetimedb /app/spacetimedb
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
 COPY README.md /app/README.md
-
-RUN chmod +x /app/docker/entrypoint.sh
+# Force rebuild of entrypoint
+RUN touch /app/docker/entrypoint.sh && chmod +x /app/docker/entrypoint.sh
 
 EXPOSE 3000
 
