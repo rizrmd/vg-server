@@ -58,14 +58,21 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Use --create-only to avoid conflicts with existing databases owned by others
-spacetime publish "${SPACETIME_DB_NAME}" \
+# Publish the module (will create new database or update if owned by this identity)
+echo "Publishing module to ${SPACETIME_DB_NAME}..."
+if spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
   --anonymous \
   --yes \
-  --no-config \
-  --create-only
+  --no-config 2>&1 | tee /tmp/publish.log; then
+  echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
+  echo "Published database: ${SPACETIME_DB_NAME}"
+else
+  echo "Publish failed, check logs above"
+  cat /tmp/publish.log
+  exit 1
+fi
 
 echo "SpacetimeDB server ready at ${SPACETIME_PUBLISH_SERVER}"
 echo "Published database: ${SPACETIME_DB_NAME}"
