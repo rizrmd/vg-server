@@ -9,7 +9,7 @@ WORKDIR /app
 COPY spacetimedb /app/spacetimedb
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
 
-RUN chmod +x /app/docker/entrypoint.sh
+RUN set -eux && chmod +x /app/docker/entrypoint.sh && cat /app/docker/entrypoint.sh | head -5
 
 EXPOSE 3000
 
