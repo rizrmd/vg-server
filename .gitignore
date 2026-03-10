@@ -1,10 +1,9 @@
 # Gleam build artifacts
-vg_server/build/
-vg_server/*.beam
+/build
 *.beam
+*.ez
 
 # Erlang crash dumps
-vg_server/erl_crash.dump
 erl_crash.dump
 
 # Rebar3
