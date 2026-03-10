@@ -1,50 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Force database name to vg-server (ignore Coolify env var)
 SPACETIME_DB_NAME="vg-server"
-OLD_DB_NAME="vg-server-20260309"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://127.0.0.1:3000}"
 SPACETIME_CONFIG_DIR="${SPACETIME_DATA_DIR}/.spacetime-cli"
 
+# Always start fresh - wipe all data
+if [ -d "${SPACETIME_DATA_DIR}" ]; then
+  echo "Wiping existing data..."
+  rm -rf "${SPACETIME_DATA_DIR:?}"/*
+fi
+
 mkdir -p "${SPACETIME_DATA_DIR}"
 mkdir -p "${SPACETIME_CONFIG_DIR}"
 
-# Set SpacetimeDB CLI config directory to persist identity across restarts
 export SPACETIME_CONFIG_DIR="${SPACETIME_CONFIG_DIR}"
 
-# Check if control-db has old database name and wipe if needed
-CONTROL_DB_FILE="${SPACETIME_DATA_DIR}/control-db/db"
-if [ -f "$CONTROL_DB_FILE" ]; then
-  if strings "$CONTROL_DB_FILE" 2>/dev/null | grep -q "$OLD_DB_NAME"; then
-    echo "Found old database name in control-db, wiping data..."
-    rm -rf "${SPACETIME_DATA_DIR:?}/replicas"/*
-    rm -rf "${SPACETIME_DATA_DIR:?}/control-db"/*
-    rm -rf "${SPACETIME_DATA_DIR:?}/cache"/*
-  fi
-fi
-
-# Clean up stale lock files from previous crashes/redeployments
-if [ -f "${SPACETIME_DATA_DIR}/spacetime.pid" ]; then
-  OLD_PID=$(cat "${SPACETIME_DATA_DIR}/spacetime.pid" 2>/dev/null || echo "")
-  if [ -n "$OLD_PID" ] && ! kill -0 "$OLD_PID" 2>/dev/null; then
-    echo "Removing stale PID file (process $OLD_PID no longer exists)"
-    rm -f "${SPACETIME_DATA_DIR}/spacetime.pid"
-  fi
-fi
-
-# Wait for control-db lock to be released (max 30 seconds)
-CONTROL_DB_LOCK="${SPACETIME_DATA_DIR}/control-db/db.lock"
-for i in $(seq 1 30); do
-  if ! [ -f "$CONTROL_DB_LOCK" ] || flock -n "$CONTROL_DB_LOCK" -c "exit 0" 2>/dev/null; then
-    break
-  fi
-  echo "Waiting for control-db lock... ($i/30)"
-  sleep 1
-done
-
-# Start SpacetimeDB server (official image has it built-in)
+# Start SpacetimeDB server
 spacetime start \
   --listen-addr '0.0.0.0:3000' \
   --data-dir "${SPACETIME_DATA_DIR}" \
@@ -70,21 +43,12 @@ for _ in $(seq 1 60); do
 done
 
 if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
-  echo "SpacetimeDB failed to start at ${SPACETIME_PUBLISH_SERVER}" >&2
+  echo "SpacetimeDB failed to start" >&2
   exit 1
 fi
 
-# Delete old and new databases if they exist (ignoring errors, anonymous mode)
-echo "Cleaning up old databases..."
-spacetime database delete "${OLD_DB_NAME}" \
-  --server "${SPACETIME_PUBLISH_SERVER}" \
-  --yes 2>/dev/null || true
-spacetime database delete "${SPACETIME_DB_NAME}" \
-  --server "${SPACETIME_PUBLISH_SERVER}" \
-  --yes 2>/dev/null || true
-
-# Publish the module fresh
-echo "Publishing module: ${SPACETIME_DB_NAME}..."
+# Publish the module
+echo "Publishing database: ${SPACETIME_DB_NAME}..."
 if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --module-path /app/spacetimedb \
@@ -95,7 +59,6 @@ if ! spacetime publish "${SPACETIME_DB_NAME}" \
   exit 1
 fi
 
-echo "SpacetimeDB ready at ${SPACETIME_PUBLISH_SERVER}"
-echo "Database: ${SPACETIME_DB_NAME}"
+echo "SpacetimeDB ready: ${SPACETIME_PUBLISH_SERVER}/${SPACETIME_DB_NAME}"
 
 wait "${SPACETIME_PID}"
