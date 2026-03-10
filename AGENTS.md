@@ -1,155 +1,168 @@
-# Triarc Slice - Game Architecture Documentation
+# Vanguard's Gambit - Game Server Architecture
 
 ## Overview
 
-Triarc Slice is a PvP card battler game with the following architecture:
-- **Frontend**: Godot 4.x game client
-- **Backend**: Gleam + OTP game server (previously SpaceTimeDB, now migrated)
-- **Data**: Hero definitions stored as JSON files
+Vanguard's Gambit is a PvP card battler game with the following architecture:
+- **Backend**: Gleam + OTP game server (migrated from SpaceTimeDB)
+- **Client**: WebSocket-based (Godot client connects via WebSocket)
 
 ## Repository Structure
 
 ```
-triarc-slice/
-├── game/                    # Godot game client
-│   ├── scenes/             # Godot scene files (.tscn)
-│   ├── scripts/            # GDScript files (.gd)
-│   ├── data/               # Game data (heroes, layouts)
-│   ├── shaders/            # GLSL shaders
-│   └── project.godot       # Godot project configuration
-├── data/                   # Hero definitions (shared)
-│   └── hero/              # Each hero has its own folder
-│       ├── {hero-name}/
-│       │   ├── hero.json       # Hero stats, lore, positioning
-│       │   └── img/            # Hero images (background, foreground, mask)
-│       └── ...
-└── editor/                 # Editor tools (if any)
+vg-server/
+├── gleam.toml              # Gleam project configuration
+├── manifest.toml           # Dependency lock file
+├── README.md               # Game rules documentation
+├── AGENTS.md               # This file - architecture documentation
+├── rebar3                  # Erlang build tool (for OTP)
+├── src/
+│   ├── vg_server.gleam     # Main entry point - starts supervisor and HTTP/WebSocket server
+│   └── vg/
+│       ├── websocket.gleam     # WebSocket handler (minimal echo implementation)
+│       ├── types.gleam         # Core data types (HeroDef, ActionDef, MatchHero, etc.)
+│       ├── content.gleam       # Static hero and action definitions (17 heroes, 30+ actions)
+│       ├── match_logic.gleam   # Game rules (damage calc, energy, cast resolution)
+│       ├── match.gleam         # OTP actor for individual match state
+│       ├── matchmaking.gleam   # OTP actor for matchmaking queue
+│       ├── match_registry.gleam # OTP actor for managing match processes
+│       └── player_registry.gleam # OTP actor for player profiles
+└── test/
+    └── vg_server_test.gleam    # Unit tests for content and game logic
 ```
 
-## Godot Client Architecture
+## Server Architecture
 
-### Main Scripts
+### Core Modules
 
-#### 1. Main.gd
-- **Purpose**: Main game controller, handles UI and game state
+#### 1. vg_server.gleam
+- **Purpose**: Main entry point
 - **Key responsibilities**:
-  - Player registration and authentication
-  - Matchmaking queue management
-  - Match state display and interaction
-  - Card casting and targeting
-  - Hero selection and display
+  - Starts OTP supervisor
+  - Starts HTTP/WebSocket server on port 8080
+  - Routes `/ws` to WebSocket handler
 
-#### 2. SpacetimeClient.gd
-- **Purpose**: HTTP client for server communication
+#### 2. websocket.gleam
+- **Purpose**: WebSocket connection handler
+- **Current state**: Minimal implementation - echoes messages back
 - **Key responsibilities**:
-  - Identity management (token-based auth)
-  - Reducer calls (game actions)
-  - SQL queries (state fetching)
-  - Session persistence
+  - Assigns random player_id on connection
+  - Handles Text frames (echoes back)
 
-#### 3. Card.gd
-- **Purpose**: Individual hero card display
-- **Key responsibilities**:
-  - Load hero data from JSON
-  - Display hero portrait, name, HP
-  - Handle card interactions (click, double-click)
+#### 3. types.gleam
+- **Purpose**: Core type definitions
+- **Key types**:
+  - `Element`: Fire, Ice, Earth, Wind, Light, Shadow
+  - `TargetRule`: AllySingle, EnemySingle, Self
+  - `EffectKind`: Damage, Heal, Shield, Status, DamageAndStatus, Cleanse
+  - `HeroDef`: Static hero stats (17 heroes defined)
+  - `ActionDef`: Action/card definitions (30+ actions)
+  - `MatchHero`, `MatchTeamState`, `MatchCast`, `GameMatch`: Runtime match entities
 
-#### 4. LayoutManager.gd
-- **Purpose**: Dynamic UI layout system
-- **Key responsibilities**:
-  - Position cards based on viewport size
-  - Responsive layout for different screen sizes
-  - Extra box rendering for game elements
+#### 4. content.gleam
+- **Purpose**: Static game content
+- **Heroes** (17): iron-knight, arc-strider, necromancer, spellblade-empress, earth-warden, dawn-priest, flame-warlock, blood-alchemist, gunslinger, night-venom, princess-emberheart, demon-empress, tyrant-overlord, arcane-paladin, storm-ranger, wind-monk, frost-queen
+- **Actions** (30+): fireball, inferno, flame_shield, meteor, burn, ice_shard, frost_armor, blizzard, frost_nova, deep_freeze, rock_throw, earth_shield, quake, stone_skin, wind_slash, gust, lightning_strike, tailwind, heal, smite, divine_shield, mass_heal, bless, judgment, shadow_strike, dark_bolt, curse, life_drain, dark_ritual, attack, defend, cleanse, focus
 
-### Game Flow
+#### 5. match_logic.gleam
+- **Purpose**: Game rules and calculations
+- **Constants**:
+  - `max_energy = 10`
+  - `start_energy = 10`
+  - `energy_regen_per_second = 1`
+  - `reroll_cost = 2`
+  - `hand_size = 5`
+  - `heroes_per_team = 3`
+- **Functions**: damage calculation, healing, shield, energy management, cast resolution, hand rolling, win condition checking
 
-1. **Startup**:
-   - Load hero definitions from `data/hero/`
-   - Initialize UI components
-   - Attempt to restore previous session
+#### 6. match.gleam
+- **Purpose**: OTP actor for individual match state
+- **Messages**: JoinMatch, GetState
+- **State**: Match metadata and player list
 
-2. **Registration**:
-   - Player enters display name
-   - Client calls `upsert_profile` reducer
-   - Profile stored on server
+#### 7. matchmaking.gleam
+- **Purpose**: OTP actor for matchmaking queue
+- **Messages**: QueuePlayer, LeaveQueue, GetMatch, TryMatch, ListQueue
 
-3. **Matchmaking**:
-   - Player selects 3 heroes
-   - Client calls `queue_for_matchmaking` reducer
-   - Server pairs players automatically
+#### 8. match_registry.gleam
+- **Purpose**: OTP actor for managing match processes
+- **Messages**: CreateMatch, GetMatch, RemoveMatch, ListMatches
 
-4. **Match Gameplay**:
-   - Server assigns teams and spawns heroes
-   - Players see their hand of 5 action cards
-   - Energy regenerates at 1/sec
-   - Players can:
-     - Select a caster hero
-     - Cast action cards on valid targets
-     - Reroll hand (costs 2 energy)
+#### 9. player_registry.gleam
+- **Purpose**: OTP actor for player profiles
+- **Messages**: UpsertProfile, GetProfile, RemoveProfile
 
-### UI Components
+## Server API
 
-- **Lobby Panel**: Registration, matchmaking controls
-- **Hero Selectors**: Dropdowns for selecting 3 heroes
-- **Caster Buttons**: Select which hero will cast
-- **Action Buttons**: 5 hand slots with action info
-- **Target Buttons**: Ally/Enemy selection for targeting
-- **Status Labels**: Energy, match status, queue status
+### Game Actions (Planned WebSocket Protocol)
 
-## Server API (SpaceTimeDB Style)
+> **Note**: The WebSocket message protocol is documented but NOT yet fully implemented in `websocket.gleam`. Current implementation only echoes messages.
 
-### Reducers
+**Client → Server:**
+```json
+{"type": "upsert_profile", "display_name": "Player1"}
+{"type": "queue_matchmaking", "hero_slug_1": "knight", "hero_slug_2": "mage", "hero_slug_3": "archer"}
+{"type": "select_caster", "match_id": "123", "slot_index": 1}
+{"type": "cast_action", "match_id": "123", "hand_slot_index": 1, "target_slot": 2}
+{"type": "reroll_hand", "match_id": "123"}
+```
 
-| Reducer | Arguments | Description |
-|---------|-----------|-------------|
-| `upsert_profile` | `[display_name]` | Create/update player profile |
-| `queue_for_matchmaking` | `[hero1, hero2, hero3]` | Join matchmaking queue |
-| `leave_matchmaking` | `[]` | Leave queue |
-| `select_caster` | `[match_id, slot_index]` | Set active caster |
-| `cast_action` | `[match_id, hand_slot, target_slot]` | Cast a card |
-| `reroll_hand` | `[match_id]` | Replace hand (costs 2 energy) |
+**Server → Client:**
+```json
+{"type": "connected", "player_id": "uuid"}
+{"type": "state_update", "match": {...}, "heroes": [...], "hand": [...]}
+{"type": "event", "event_type": "cast_started", "data": {...}}
+{"type": "error", "code": "INVALID_TARGET", "message": "..."}
+```
 
-### Tables (Server State)
+### Data Types (Runtime)
 
-- `player_profile`: Player registration data
-- `matchmaking_queue`: Players waiting for match
-- `game_match`: Active matches
-- `match_player`: Players in matches
-- `match_hero`: Hero instances in matches
-- `match_team_state`: Energy, selected caster per team
-- `match_hand_slot`: Current hand cards
-- `action_def`: Available actions/cards
-- `hero_def`: Hero definitions
+- `PlayerProfile`: Player registration data
+- `MatchmakingEntry`: Players waiting for match
+- `GameMatch`: Active matches
+- `MatchPlayer`: Players in matches
+- `MatchHero`: Hero instances in matches
+- `MatchTeamState`: Energy, selected caster per team
+- `MatchHandSlot`: Current hand cards
+- `MatchStatus`: Active status effects
+- `MatchCast`: In-flight casts
+- `HeroDef`: Static hero definitions
+- `ActionDef`: Static action/card definitions
 
 ## Hero Data Format
 
-Each hero has a `hero.json` file:
+Hero definitions are hardcoded in `src/vg/content.gleam` as Gleam records:
 
-```json
-{
-  "full_name": "Display Name",
-  "lore": "Hero description...",
-  "stats": {
-    "max_hp": 1000,
-    "attack": 100,
-    "defense": 50,
-    "element_affinity": {
-      "fire": 10,
-      "ice": 0,
-      "earth": 5,
-      "wind": -5,
-      "light": 0,
-      "shadow": 0
-    }
-  },
-  "char_bg_pos": {"x": 0, "y": 0},
-  "char_fg_pos": {"x": 0, "y": 0},
-  "char_bg_scale": 100,
-  "char_fg_scale": 100,
-  "name_pos": {"x": 0, "y": 0},
-  "name_scale": 50,
-  "tint": "#ffffff"
+```gleam
+pub type HeroDef {
+  HeroDef(
+    slug: String,
+    display_name: String,
+    max_hp: Int,
+    attack: Int,
+    defense: Int,
+    fire_affinity: Int,
+    ice_affinity: Int,
+    earth_affinity: Int,
+    wind_affinity: Int,
+    light_affinity: Int,
+    shadow_affinity: Int,
+  )
 }
+
+// Example: Iron Knight
+HeroDef(
+  slug: "iron-knight",
+  display_name: "Iron Knight",
+  max_hp: 3500,
+  attack: 130,
+  defense: 180,
+  fire_affinity: -15,
+  ice_affinity: 10,
+  earth_affinity: 30,
+  wind_affinity: -20,
+  light_affinity: 10,
+  shadow_affinity: 0,
+)
 ```
 
 ## Key Game Mechanics
@@ -179,54 +192,57 @@ Each hero has a `hero.json` file:
   - Element
   - Effect (damage, heal, shield, status)
 
-## Migration Notes (SpaceTimeDB → Gleam)
+## Migration Status (SpaceTimeDB → Gleam)
+
+### Completed
+- ✅ Core type definitions (`types.gleam`)
+- ✅ Static content (heroes and actions in `content.gleam`)
+- ✅ Game logic (damage calc, energy, cast resolution in `match_logic.gleam`)
+- ✅ OTP actor infrastructure (match, matchmaking, registries)
+- ✅ Basic WebSocket server setup
+
+### In Progress / TODO
+- 🔄 Full WebSocket message protocol implementation
+- 🔄 State serialization/push to clients
+- 🔄 Match lifecycle orchestration (start, tick, end)
+- 🔄 Hand management and action casting flow
 
 ### Client Changes Needed
 
 1. **Connection**: Replace HTTP/REST with WebSocket
-2. **Authentication**: Token-based → Connection-based
-3. **State Updates**: Polling → Push notifications
-4. **Message Format**: JSON → MessagePack (optional)
-
-### Server API Changes
-
-| Old (SpaceTimeDB) | New (Gleam WebSocket) |
-|-------------------|----------------------|
-| HTTP POST /v1/identity | WebSocket connect with player_id |
-| HTTP POST /call/{reducer} | WebSocket message: `{type: "cast_action", ...}` |
-| HTTP POST /sql | WebSocket message: `{type: "get_state"}` |
-| Polling for updates | Server pushes state updates |
-
-### Message Protocol (WebSocket)
-
-**Client → Server:**
-```json
-{"type": "upsert_profile", "display_name": "Player1"}
-{"type": "queue_matchmaking", "hero_slug_1": "knight", ...}
-{"type": "select_caster", "match_id": "123", "slot_index": 1}
-{"type": "cast_action", "match_id": "123", "hand_slot_index": 1, "target_slot": 2}
-{"type": "reroll_hand", "match_id": "123"}
-```
-
-**Server → Client:**
-```json
-{"type": "connected", "player_id": "uuid"}
-{"type": "state_update", "match": {...}, "heroes": [...], "hand": [...]}
-{"type": "event", "event_type": "cast_started", "data": {...}}
-{"type": "error", "code": "INVALID_TARGET", "message": "..."}
-```
+2. **Authentication**: Token-based → Connection-based (random player_id assigned on connect)
+3. **State Updates**: Polling → Push notifications (not yet implemented)
+4. **Message Format**: JSON → MessagePack (optional - currently JSON)
 
 ## Development Workflow
 
-1. **Modify Hero Data**: Edit JSON files in `data/hero/`
-2. **Game Logic**: Modify GDScript in `game/scripts/`
-3. **Server Logic**: Modify Gleam files in `vg_server/src/`
-4. **Test**: Run both client and server locally
+1. **Modify Hero/Action Data**: Edit `src/vg/content.gleam`
+2. **Game Logic**: Modify `src/vg/match_logic.gleam`
+3. **Server Logic**: Modify Gleam files in `src/vg/`
+4. **Main Entry**: Modify `src/vg_server.gleam`
+5. **Test**: Run `gleam test`
+6. **Run Server**: `gleam run`
+
+## Build & Run
+
+```bash
+# Install dependencies
+gleam deps download
+
+# Run tests
+gleam test
+
+# Run the server
+gleam run
+# Server starts on port 8080
+```
 
 ## Debugging Tips
 
-- Use Godot's remote debugger for client issues
-- Check browser Network tab for HTTP requests
-- Enable verbose logging in SpacetimeClient
-- Verify hero JSON files are valid
-- Check server logs for reducer errors
+- Check server logs in terminal
+- Use WebSocket client (e.g., `websocat`, browser console) to test connections:
+  ```bash
+  websocat ws://localhost:8080/ws
+  ```
+- Review `match_logic.gleam` for game rule calculations
+- Check actor states by adding debug logging
