@@ -1,9 +1,0 @@
-.git
-.gitmodules
-.cursor
-.github
-triarc-slice
-spacetimedb/target
-**/.DS_Store
-**/*.exe
-**/*.macos

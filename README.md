@@ -1,57 +1,6 @@
-# vg-server
+# Vanguard's Gambit Gameplay
 
-SpaceTimeDB authoritative server for the Vanguard's Gambit PvP card battler.
-
-## Scope
-
-This repo owns player registration, matchmaking, match state, and combat rules.
-
-- `triarc-slice/` is a git submodule and is not modified by this server.
-- `spacetimedb/` contains the Rust module.
-- The server is authoritative for energy, casting, rerolls, damage, status effects, and victory.
-
-## Tooling
-
-Rust is configured through `mise`.
-
-```bash
-mise x -- cargo check
-spacetime build --module-path spacetimedb
-```
-
-## Docker
-
-Build the server image:
-
-```bash
-docker build -t vg-server .
-```
-
-Run the local standalone SpaceTimeDB server and publish the module into it:
-
-```bash
-docker run --rm -p 3000:3000 vg-server
-```
-
-Useful environment variables:
-
-- `SPACETIME_HOST=127.0.0.1`
-- `SPACETIME_PORT=3000`
-- `SPACETIME_LISTEN_ADDR=0.0.0.0:3000`
-- `SPACETIME_DATA_DIR=/var/lib/spacetimedb`
-- `SPACETIME_DB_NAME=vg-server`
-- `SPACETIME_PUBLISH_SERVER=http://127.0.0.1:3000`
-- `SPACETIME_DELETE_DATA_ON_START=0`
-
-Example with persistent data:
-
-```bash
-docker run --rm \
-  -p 3000:3000 \
-  -v vg-server-data:/var/lib/spacetimedb \
-  -e SPACETIME_DB_NAME=vg-server \
-  vg-server
-```
+This server defines the authoritative gameplay rules for the Vanguard's Gambit PvP card battler.
 
 ## Current Rules
 
@@ -80,12 +29,6 @@ There are now two supported ways to enter a game:
    - `queue_for_matchmaking(hero_slug_1, hero_slug_2, hero_slug_3)`
    - automatic pairing into a live match
    - `leave_matchmaking()` if the player wants to cancel before a match is made
-
-## Module Layout
-
-- [`spacetimedb/src/lib.rs`](/home/riz/vg-server/spacetimedb/src/lib.rs): schema, seeded content, reducers, tick loop
-- [`spacetimedb/Cargo.toml`](/home/riz/vg-server/spacetimedb/Cargo.toml): SpaceTimeDB Rust module crate
-- [`spacetime.json`](/home/riz/vg-server/spacetime.json): project config
 
 ## Tables
 
@@ -439,12 +382,3 @@ Recommended client mapping:
 - hard status handling is minimal
 - shield is implemented as a timed status bucket
 - `create_match()` does not return `match_id`; the client must discover it by subscription
-
-## Good Next Steps
-
-- add reducer tests for create/join/cast/reroll/win flow
-- add reducer tests for profile and matchmaking pairing flow
-- add per-player action loadouts instead of one global pool
-- add MMR, queue buckets, and regional matchmaking rules
-- add explicit published docs for hero/action slugs shared with the client
-- add bot/opponent helpers if you want solo testing before full multiplayer

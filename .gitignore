@@ -1,1 +1,19 @@
-spacetimedb/target/
+# Gleam build artifacts
+vg_server/build/
+vg_server/*.beam
+*.beam
+
+# Erlang crash dumps
+vg_server/erl_crash.dump
+erl_crash.dump
+
+# Rebar3
+rebar3
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
