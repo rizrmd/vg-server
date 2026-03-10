@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Force database name to vg-server (ignore Coolify env var)
 SPACETIME_DB_NAME="vg-server"
+OLD_DB_NAME="vg-server-20260309"
 SPACETIME_DATA_DIR="${SPACETIME_DATA_DIR:-/var/lib/spacetimedb}"
 SPACETIME_PUBLISH_SERVER="${SPACETIME_PUBLISH_SERVER:-http://127.0.0.1:3000}"
 SPACETIME_CONFIG_DIR="${SPACETIME_DATA_DIR}/.spacetime-cli"
@@ -12,6 +13,17 @@ mkdir -p "${SPACETIME_CONFIG_DIR}"
 
 # Set SpacetimeDB CLI config directory to persist identity across restarts
 export SPACETIME_CONFIG_DIR="${SPACETIME_CONFIG_DIR}"
+
+# Check if control-db has old database name and wipe if needed
+CONTROL_DB_FILE="${SPACETIME_DATA_DIR}/control-db/db"
+if [ -f "$CONTROL_DB_FILE" ]; then
+  if strings "$CONTROL_DB_FILE" 2>/dev/null | grep -q "$OLD_DB_NAME"; then
+    echo "Found old database name in control-db, wiping data..."
+    rm -rf "${SPACETIME_DATA_DIR:?}/replicas"/*
+    rm -rf "${SPACETIME_DATA_DIR:?}/control-db"/*
+    rm -rf "${SPACETIME_DATA_DIR:?}/cache"/*
+  fi
+fi
 
 # Clean up stale lock files from previous crashes/redeployments
 if [ -f "${SPACETIME_DATA_DIR}/spacetime.pid" ]; then
@@ -62,14 +74,16 @@ if ! curl -fsS "${SPACETIME_PUBLISH_SERVER}/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Delete old database if it exists (ignoring errors)
-echo "Cleaning up old database..."
+# Delete old and new databases if they exist (ignoring errors, anonymous mode)
+echo "Cleaning up old databases..."
+spacetime database delete "${OLD_DB_NAME}" \
+  --server "${SPACETIME_PUBLISH_SERVER}" \
+  --yes 2>/dev/null || true
 spacetime database delete "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
   --yes 2>/dev/null || true
 
 # Publish the module fresh
-echo "SPACETIME_DB_NAME=${SPACETIME_DB_NAME}"
 echo "Publishing module: ${SPACETIME_DB_NAME}..."
 if ! spacetime publish "${SPACETIME_DB_NAME}" \
   --server "${SPACETIME_PUBLISH_SERVER}" \
