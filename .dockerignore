@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+*.beam
+
+# Local database
+*.db
+*.db-journal
+
+# Erlang crash dumps
+erl_crash.dump
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+AGENTS.md
+
+# GitHub
+.github/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
