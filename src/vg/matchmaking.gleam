@@ -18,6 +18,7 @@ pub type Message {
     reply_to: Subject(Result(Nil, String)),
   )
   LeaveQueue(player_id: String, reply_to: Subject(Result(Nil, Nil)))
+  RemoveMatched(player1: String, player2: String, reply_to: Subject(Nil))
   GetMatch(
     player_id: String,
     reply_to: Subject(Result(#(String, Int), Nil)),
@@ -70,6 +71,13 @@ fn handle_message(
       process.send(reply_to, Ok(Nil))
       actor.continue(MatchmakingQueue(entries: new_entries))
     }
+    RemoveMatched(player1, player2, reply_to) -> {
+      let new_entries = state.entries
+      |> dict.delete(player1)
+      |> dict.delete(player2)
+      process.send(reply_to, Nil)
+      actor.continue(MatchmakingQueue(entries: new_entries))
+    }
     GetMatch(_player_id, reply_to) -> {
       process.send(reply_to, Error(Nil))
       actor.continue(state)
@@ -113,4 +121,12 @@ pub fn try_match(
 
 pub fn list_queue(queue: Subject(Message)) -> List(MatchmakingEntry) {
   process.call(queue, waiting: 5000, sending: fn(subject) { ListQueue(subject) })
+}
+
+pub fn remove_matched(
+  queue: Subject(Message),
+  player1: String,
+  player2: String,
+) -> Nil {
+  process.call(queue, waiting: 5000, sending: fn(subject) { RemoveMatched(player1, player2, subject) })
 }

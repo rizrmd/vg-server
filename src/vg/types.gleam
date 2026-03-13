@@ -47,6 +47,11 @@ pub type TargetRule {
   AllySingle
   EnemySingle
   Self
+  AnySingle
+  AllyAuto
+  EnemyAuto
+  AnyAuto
+  NoTarget
 }
 
 pub fn target_rule_to_string(rule: TargetRule) -> String {
@@ -54,6 +59,11 @@ pub fn target_rule_to_string(rule: TargetRule) -> String {
     AllySingle -> "ally_single"
     EnemySingle -> "enemy_single"
     Self -> "self"
+    AnySingle -> "any_single"
+    AllyAuto -> "ally_auto"
+    EnemyAuto -> "enemy_auto"
+    AnyAuto -> "any_auto"
+    NoTarget -> "no_target"
   }
 }
 
@@ -62,6 +72,11 @@ pub fn target_rule_from_string(s: String) -> Result(TargetRule, Nil) {
     "ally_single" -> Ok(AllySingle)
     "enemy_single" -> Ok(EnemySingle)
     "self" -> Ok(Self)
+    "any_single" -> Ok(AnySingle)
+    "ally_auto" -> Ok(AllyAuto)
+    "enemy_auto" -> Ok(EnemyAuto)
+    "any_auto" -> Ok(AnyAuto)
+    "no_target" -> Ok(NoTarget)
     _ -> Error(Nil)
   }
 }

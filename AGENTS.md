@@ -43,10 +43,12 @@ vg-server/
 
 #### 2. websocket.gleam
 - **Purpose**: WebSocket connection handler
-- **Current state**: Minimal implementation - echoes messages back
+- **Current state**: Handles the game WebSocket protocol and pushes state updates
 - **Key responsibilities**:
   - Assigns random player_id on connection
-  - Handles Text frames (echoes back)
+  - Parses client JSON messages
+  - Routes gameplay messages to OTP actors
+  - Pushes match state and events back to clients
 
 #### 3. types.gleam
 - **Purpose**: Core type definitions
@@ -93,23 +95,25 @@ vg-server/
 
 ## Server API
 
-### Game Actions (Planned WebSocket Protocol)
-
-> **Note**: The WebSocket message protocol is documented but NOT yet fully implemented in `websocket.gleam`. Current implementation only echoes messages.
+### Game Actions (WebSocket Protocol)
 
 **Client → Server:**
 ```json
 {"type": "upsert_profile", "display_name": "Player1"}
 {"type": "queue_matchmaking", "hero_slug_1": "knight", "hero_slug_2": "mage", "hero_slug_3": "archer"}
-{"type": "select_caster", "match_id": "123", "slot_index": 1}
-{"type": "cast_action", "match_id": "123", "hand_slot_index": 1, "target_slot": 2}
+{"type": "cast_action", "match_id": "123", "caster_slot": 1, "hand_slot_index": 2}
 {"type": "reroll_hand", "match_id": "123"}
 ```
+
+**Gameplay flow:**
+- Player drags a card from the hand onto a hero (caster)
+- Targeting is resolved automatically by the server from the action definition
+- Caster becomes busy while casting, then effect applies
 
 **Server → Client:**
 ```json
 {"type": "connected", "player_id": "uuid"}
-{"type": "state_update", "match": {...}, "heroes": [...], "hand": [...]}
+{"type": "state_update", "match": {...}, "players": [...], "team_states": [...], "heroes": [...], "hand": [...], "statuses": [...], "casts": [...]}
 {"type": "event", "event_type": "cast_started", "data": {...}}
 {"type": "error", "code": "INVALID_TARGET", "message": "..."}
 ```
@@ -121,7 +125,7 @@ vg-server/
 - `GameMatch`: Active matches
 - `MatchPlayer`: Players in matches
 - `MatchHero`: Hero instances in matches
-- `MatchTeamState`: Energy, selected caster per team
+- `MatchTeamState`: Energy and per-team combat state
 - `MatchHandSlot`: Current hand cards
 - `MatchStatus`: Active status effects
 - `MatchCast`: In-flight casts
@@ -185,10 +189,13 @@ HeroDef(
 - 2 teams per match
 - 3 heroes per team
 - 5 visible hand cards
+- playing a card means dragging it onto one of your own heroes
+- the dropped-on hero becomes the acting hero for that card
+- targeting is resolved automatically by the server
 - Actions have:
   - Energy cost
   - Casting time (ms)
-  - Target type (ally/enemy/self)
+  - Targeting rules used for auto-resolution
   - Element
   - Effect (damage, heal, shield, status)
 
@@ -202,10 +209,8 @@ HeroDef(
 - ✅ Basic WebSocket server setup
 
 ### In Progress / TODO
-- 🔄 Full WebSocket message protocol implementation
-- 🔄 State serialization/push to clients
 - 🔄 Match lifecycle orchestration (start, tick, end)
-- 🔄 Hand management and action casting flow
+- 🔄 Hand management and action casting flow polish
 
 ### Client Changes Needed
 

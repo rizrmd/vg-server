@@ -7,15 +7,14 @@ This server defines the authoritative gameplay rules for the Vanguard's Gambit P
 - 2 teams per match
 - 3 heroes per team
 - shared visible hand of 5 action cards
-- any alive hero can cast any visible card
-- no cooldowns
-- each card has a cast time
+- drag a card onto a hero to cast it
+- casting takes time (each card has its own cast time)
 - shared team energy
 - `max energy = 10`
 - `start energy = 10`
 - `regen = 1 energy / second`
 - `reroll cost = 2 energy`
-- reroll replaces the whole hand with 5 random actions from the global server action pool
+- reroll replaces the whole hand with 5 random actions
 
 ## Player Flow
 
@@ -276,36 +275,14 @@ Behavior:
 
 Removes the caller from the matchmaking queue.
 
-### `select_caster(match_id, slot_index)`
+### `cast_action(match_id, caster_slot, hand_slot_index)`
 
-Sets the active casting hero for the caller's team.
+Drag a card from the hand onto a hero to cast it.
 
-Rules:
+The dropped-on hero becomes the acting hero for that card.
+Targeting is resolved automatically by the server from the action definition.
 
-- slot must be `1..=3`
-- hero must be alive
-
-### `cast_action(match_id, hand_slot_index, target_slot)`
-
-Starts a cast using the currently selected caster.
-
-Validation:
-
-- caller must belong to the match
-- match must be active
-- caster must be selected
-- caster must be alive
-- caster must not already be busy
-- enough team energy must exist
-- target must match the action target rule
-- target must be alive
-
-Resolution:
-
-- energy is spent immediately
-- a `match_cast` row is inserted
-- caster is marked busy until the cast resolves
-- the tick reducer applies the effect when `resolves_at` is reached
+Energy is spent immediately and the caster is busy until casting finishes.
 
 ### `reroll_hand(match_id)`
 
