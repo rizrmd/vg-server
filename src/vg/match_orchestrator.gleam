@@ -10,9 +10,13 @@ import vg/match
 import vg/match_registry
 import vg/matchmaking
 
+const matchmaking_interval_ms = 1000
+const match_tick_interval_ms = 200
+
 // Orchestrator state
 pub type OrchestratorState {
   OrchestratorState(
+    orchestrator: Subject(Message),
     matchmaking: Subject(matchmaking.Message),
     match_registry: Subject(match_registry.Message),
     connection_registry: Subject(connection_registry.Message),
@@ -30,14 +34,18 @@ pub fn start(
   match_registry: Subject(match_registry.Message),
   connection_registry: Subject(connection_registry.Message),
 ) {
-  let initial_state =
-    OrchestratorState(
-      matchmaking: matchmaking,
-      match_registry: match_registry,
-      connection_registry: connection_registry,
+  actor.new_with_initialiser(1000, fn(orchestrator) {
+    actor.initialised(
+      OrchestratorState(
+        orchestrator: orchestrator,
+        matchmaking: matchmaking,
+        match_registry: match_registry,
+        connection_registry: connection_registry,
+      ),
     )
-
-  actor.new(initial_state)
+    |> actor.returning(orchestrator)
+    |> Ok
+  })
   |> actor.on_message(handle_message)
   |> actor.start
 }
@@ -122,8 +130,12 @@ fn handle_message(
         None -> Nil
       }
 
-      // Schedule next matchmaking attempt (every 2 seconds)
-      // The actor loop will continue and we rely on external triggers or a timer
+      let _ =
+        process.send_after(
+          state.orchestrator,
+          matchmaking_interval_ms,
+          RunMatchmaking,
+        )
       actor.continue(state)
     }
 
@@ -140,6 +152,12 @@ fn handle_message(
         }
       })
 
+      let _ =
+        process.send_after(
+          state.orchestrator,
+          match_tick_interval_ms,
+          TickMatches(get_timestamp()),
+        )
       actor.continue(state)
     }
   }

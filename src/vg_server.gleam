@@ -17,7 +17,7 @@ import vg/matchmaking
 import vg/player_registry
 import vg/websocket
 
-const default_port = 8080
+const default_port = 7567
 
 const default_db_path = "vg_server.db"
 
