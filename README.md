@@ -1,361 +1,304 @@
-# Vanguard's Gambit Gameplay
-
-This server defines the authoritative gameplay rules for the Vanguard's Gambit PvP card battler.
-
-## Current Rules
-
-- 2 teams per match
-- 3 heroes per team
-- shared visible hand of 5 action cards
-- drag a card onto a hero to cast it
-- casting takes time (each card has its own cast time)
-- shared team energy
-- `max energy = 10`
-- `start energy = 10`
-- `regen = 1 energy / second`
-- `reroll cost = 2 energy`
-- reroll replaces the whole hand with 5 random actions
+# Vanguard's Gambit - Game Server
 
-## Player Flow
+WebSocket game server for the Vanguard's Gambit PvP card battler.
 
-There are now two supported ways to enter a game:
+**Server URL:** `wss://sg.vangambit.com/ws`
+**Test page:** `https://sg.vangambit.com/sign-in/test`
 
-1. Manual rooms
-   - `create_match()`
-   - `join_match(match_id, hero_slug_1, hero_slug_2, hero_slug_3)`
-2. Matchmaking
-   - `upsert_profile(display_name)`
-   - `queue_for_matchmaking(hero_slug_1, hero_slug_2, hero_slug_3)`
-   - automatic pairing into a live match
-   - `leave_matchmaking()` if the player wants to cancel before a match is made
+## Connection & Authentication
 
-## Tables
+All communication is via **WebSocket JSON messages**. Authentication via Google Sign-In is required before any gameplay messages.
 
-Content tables:
+### Step 1: Connect
 
-- `hero_def`
-- `action_def`
+Connect to `wss://sg.vangambit.com/ws`. Server responds:
 
-Runtime tables:
+```json
+{"type": "connected", "player_id": "anon_123456"}
+```
 
-- `player_profile`
-- `matchmaking_queue`
-- `game_match`
-- `match_player`
-- `match_team_state`
-- `match_hero`
-- `match_hand_slot`
-- `match_status`
-- `match_cast`
-- `game_schedule`
+The `anon_*` ID is temporary. You must authenticate to get a persistent player ID.
 
-### `hero_def`
+### Step 2: Authenticate with Google
 
-Server-side hero rules keyed by slug.
+The client must obtain a **Google ID token** using Google Sign-In, then send:
 
-Fields:
+```json
+{"type": "authenticate", "id_token": "<google_id_token_string>"}
+```
 
-- `slug`
-- `display_name`
-- `max_hp`
-- `attack`
-- `defense`
-- `fire_affinity`
-- `ice_affinity`
-- `earth_affinity`
-- `wind_affinity`
-- `light_affinity`
-- `shadow_affinity`
+**Godot implementation:**
+1. Use a Google Sign-In plugin (e.g., [Godot Google Play Games Services](https://github.com/nickenough/godot-gpc) for Android, or a web-based OAuth flow)
+2. Get the ID token from the Google Sign-In result
+3. Send it to the server as shown above
+4. Cache the token locally for reconnection
 
-### `action_def`
+**On success**, server responds:
 
-Server-side action rules keyed by slug.
+```json
+{
+  "type": "authenticated",
+  "player_id": "g_123456789",
+  "display_name": "Player Name",
+  "email": "player@gmail.com"
+}
+```
 
-Fields:
+The `player_id` (format `g_<google_sub>`) is persistent — same Google account always gets the same ID. Store this locally.
 
-- `slug`
-- `display_name`
-- `element`
-- `target_rule`
-- `energy_cost`
-- `casting_time_ms`
-- `effect_kind`
-- `base_power`
-- `status_kind`
-- `status_duration_ms`
-- `status_value`
+**On failure:**
 
-Supported `target_rule` values right now:
+```json
+{"type": "auth_error", "code": "INVALID_TOKEN", "message": "..."}
+```
 
-- `ally_single`
-- `enemy_single`
-- `self`
+Error codes: `INVALID_TOKEN`, `NO_DB`, `DB_ERROR`, `NOT_AUTHENTICATED`
 
-Supported `effect_kind` values right now:
+**All messages sent before authenticating will be rejected with:**
 
-- `damage`
-- `heal`
-- `shield`
-- `status`
-- `damage_and_status`
-- `cleanse`
+```json
+{"type": "auth_error", "code": "NOT_AUTHENTICATED", "message": "Send authenticate message first"}
+```
 
-### `player_profile`
+### Step 3: Reconnection
 
-Player registration/profile keyed by SpaceTimeDB identity.
+On reconnect, send the cached Google ID token again. If the token is expired (Google ID tokens last ~1 hour), refresh it via Google Sign-In before reconnecting.
 
-Fields:
+## Game Rules
 
-- `identity`
-- `display_name`
-- `created_at`
-- `updated_at`
+- 2 teams per match, 3 heroes per team
+- Shared visible hand of 5 action cards
+- Drag a card onto one of your heroes to cast it (hero becomes the caster)
+- Targeting is resolved automatically by the server
+- Shared team energy: max 10, start 10, regen 1/second
+- Reroll cost: 2 energy (replaces entire hand)
+- Each card has its own cast time (hero is busy while casting)
 
-### `matchmaking_queue`
+## Client → Server Messages
 
-Queued matchmaking entries. Hero selection is captured at queue time.
+All messages require authentication except `authenticate`.
 
-Fields:
+### `authenticate`
 
-- `queue_entry_id`
-- `identity`
-- `hero_slug_1`
-- `hero_slug_2`
-- `hero_slug_3`
-- `queued_at`
+```json
+{"type": "authenticate", "id_token": "<google_id_token>"}
+```
 
-### `game_match`
+### `upsert_profile`
 
-One row per match.
+```json
+{"type": "upsert_profile", "display_name": "MyName"}
+```
 
-Fields:
+### `queue_matchmaking`
 
-- `match_id`
-- `phase`
-  - `1 = waiting`
-  - `2 = active`
-  - `3 = finished`
-- `created_at`
-- `started_at`
-- `winner_team`
-  - `0 = none`
-  - `1 = player team`
-  - `2 = enemy team`
-- `next_random`
+```json
+{
+  "type": "queue_matchmaking",
+  "hero_slug_1": "iron-knight",
+  "hero_slug_2": "arc-strider",
+  "hero_slug_3": "flame-warlock"
+}
+```
 
-### `match_player`
+### `cast_action`
 
-Maps a connected SpaceTimeDB identity into a match team.
+```json
+{
+  "type": "cast_action",
+  "match_id": "match_123",
+  "caster_slot": 1,
+  "hand_slot_index": 2
+}
+```
 
-Fields:
+- `caster_slot`: hero slot (1-3) the card is dropped on
+- `hand_slot_index`: which card from the hand (1-5)
 
-- `player_id`
-- `match_id`
-- `identity`
-- `team`
+### `reroll_hand`
 
-### `match_team_state`
+```json
+{"type": "reroll_hand", "match_id": "match_123"}
+```
 
-Shared team runtime state.
+Costs 2 energy. Replaces the entire hand with 5 random actions.
 
-Fields:
+### `leave_match`
 
-- `team_state_id`
-- `match_id`
-- `team`
-- `energy`
-- `energy_max`
-- `last_energy_at`
-- `selected_caster_slot`
+```json
+{"type": "leave_match", "match_id": "match_123"}
+```
 
-### `match_hero`
+### `get_match_history`
 
-Spawned match-local hero instance.
+```json
+{"type": "get_match_history", "limit": 10, "offset": 0}
+```
 
-Fields:
+### `get_leaderboard`
 
-- `hero_instance_id`
-- `match_id`
-- `team`
-- `slot_index`
-- `hero_slug`
-- `hp_current`
-- `hp_max`
-- `alive`
-- `busy_until`
+```json
+{"type": "get_leaderboard", "limit": 10}
+```
 
-### `match_hand_slot`
+### `get_player_stats`
 
-One visible action slot in the team hand.
+```json
+{"type": "get_player_stats", "target_player_id": "g_123456789"}
+```
 
-Fields:
+## Server → Client Messages
 
-- `hand_slot_id`
-- `match_id`
-- `team`
-- `slot_index`
-- `action_slug`
+### `connected`
 
-### `match_status`
+Sent immediately on WebSocket connect.
 
-Active timed status on a specific hero instance.
+```json
+{"type": "connected", "player_id": "anon_123456"}
+```
 
-Fields:
+### `authenticated`
 
-- `status_id`
-- `match_id`
-- `hero_instance_id`
-- `kind`
-- `value`
-- `expires_at`
+Sent after successful Google token verification.
 
-### `match_cast`
-
-In-flight cast created when a hero starts channeling a card.
-
-Fields:
-
-- `cast_id`
-- `match_id`
-- `team`
-- `caster_hero_instance_id`
-- `target_hero_instance_id`
-- `action_slug`
-- `started_at`
-- `resolves_at`
-- `resolved`
-
-## Reducers
-
-### `upsert_profile(display_name)`
-
-Creates or updates the caller's player profile.
-
-Rules:
-
-- display name must be non-empty
-- display name max length is 32
-
-### `create_match()`
-
-Creates a waiting match and inserts the calling identity as team `1`.
-
-Important:
-
-- SpaceTimeDB reducers do not return values.
-- The client should discover the created match by subscribing to `game_match` and `match_player`, then finding the row tied to its own identity.
-- the player cannot already be queued or inside an unfinished match
-
-### `join_match(match_id, hero_slug_1, hero_slug_2, hero_slug_3)`
-
-Joins the waiting match as the next open team, validates the 3 hero slugs, spawns heroes, rolls a starting hand, and starts the match once both teams are present.
-
-Rules:
-
-- the player cannot already be queued or inside an unfinished match
-- hero selection happens here for manual rooms
-
-### `queue_for_matchmaking(hero_slug_1, hero_slug_2, hero_slug_3)`
-
-Queues the player for automatic 1v1 matchmaking.
-
-Rules:
-
-- player must have a `player_profile`
-- player cannot already be queued
-- player cannot already be inside an unfinished match
-- the 3 submitted heroes are validated immediately
-
-Behavior:
-
-- if no opponent is queued, a `matchmaking_queue` row is inserted
-- if an opponent is already queued, the server creates a match immediately, assigns teams, spawns both hero squads, rolls both hands, starts the match, and removes the older queue entry
-
-### `leave_matchmaking()`
-
-Removes the caller from the matchmaking queue.
-
-### `cast_action(match_id, caster_slot, hand_slot_index)`
-
-Drag a card from the hand onto a hero to cast it.
-
-The dropped-on hero becomes the acting hero for that card.
-Targeting is resolved automatically by the server from the action definition.
-
-Energy is spent immediately and the caster is busy until casting finishes.
-
-### `reroll_hand(match_id)`
-
-Costs 2 energy and replaces the whole visible hand with 5 random actions from the global action pool.
-
-### `tick_game(...)`
-
-Scheduled internal reducer.
-
-Responsibilities:
-
-- regen energy
-- expire statuses
-- resolve finished casts
-- check win conditions
-
-## Match Lifecycle
-
-1. Client calls `create_match()`.
-2. Client subscribes to `game_match` and `match_player`.
-3. Client finds the waiting match row it owns through its identity.
-4. Both players call `join_match(...)` with 3 hero slugs.
-5. Server spawns heroes, creates visible hands, and flips the match to active.
-6. During play:
-   - select a caster
-   - cast a visible hand slot onto a valid target slot
-   - or reroll the hand
-7. Tick processing resolves casts and statuses until one team has no living heroes.
-
-### Matchmaking Flow
-
-1. Client calls `upsert_profile(display_name)`.
-2. Client calls `queue_for_matchmaking(hero_slug_1, hero_slug_2, hero_slug_3)`.
-3. If no opponent exists, the player appears in `matchmaking_queue`.
-4. When a second queued player arrives, the server:
-   - creates a match
-   - inserts both `match_player` rows
-   - spawns both teams
-   - creates starting hands
-   - marks the match active
-   - removes the matched queue entry
-5. Each client discovers the new match by subscribing to `match_player` and `game_match` for its own identity.
-
-## Client Integration Notes
-
-Suggested client subscriptions:
-
-- `game_match`
-- `player_profile`
-- `matchmaking_queue`
-- `match_player`
-- `match_team_state`
-- `match_hero`
-- `match_hand_slot`
-- `match_status`
-- `match_cast`
-- `hero_def`
-- `action_def`
-
-Recommended client mapping:
-
-- player's own team comes from `match_player.identity == local identity`
-- hero board slots come from `match_hero.slot_index`
-- visible hand comes from `match_hand_slot.slot_index`
-- selected caster comes from `match_team_state.selected_caster_slot`
-- a hero is currently channeling if `busy_until > now`
+```json
+{
+  "type": "authenticated",
+  "player_id": "g_123456789",
+  "display_name": "Player Name",
+  "email": "player@gmail.com"
+}
+```
+
+### `auth_error`
+
+```json
+{"type": "auth_error", "code": "INVALID_TOKEN", "message": "..."}
+```
+
+### `matchmaking_queued`
+
+```json
+{"type": "matchmaking_queued"}
+```
+
+### `match_found`
+
+```json
+{"type": "match_found", "match_id": "match_123", "team": 1}
+```
+
+### `state_update`
+
+Full match state push. Sent after actions, periodically during match.
+
+```json
+{
+  "type": "state_update",
+  "match": {
+    "match_id": "match_123",
+    "phase": 2,
+    "created_at": 1234567890,
+    "started_at": 1234567890,
+    "winner": 0
+  },
+  "players": [
+    {"player_id": "g_123", "match_id": "match_123", "team": 1}
+  ],
+  "team_states": [
+    {"match_id": "match_123", "team": 1, "energy": 8, "energy_max": 10, "last_energy_at": 1234567890, "selected_caster_slot": 0}
+  ],
+  "heroes": [
+    {"hero_instance_id": "hero_1", "match_id": "match_123", "team": 1, "slot_index": 1, "hero_slug": "iron-knight", "hp_current": 3500, "hp_max": 3500, "alive": true, "busy_until": 0}
+  ],
+  "hand": [
+    {"match_id": "match_123", "team": 1, "slot_index": 1, "action_slug": "fireball", "action_name": "Fireball", "energy_cost": 3, "target_rule": "enemy_single", "targeting": {"side": "enemy", "scope": "single", "selection": "manual", "allow_self": false, "allow_dead": false}}
+  ],
+  "statuses": [],
+  "casts": []
+}
+```
+
+**Match phase:** `1 = waiting`, `2 = active`, `3 = finished`
+**Winner:** `0 = none`, `1 = team 1`, `2 = team 2`
+
+### `event`
+
+```json
+{"type": "event", "event_type": "cast_started", "data": {...}}
+```
+
+### `error`
+
+```json
+{"type": "error", "code": "CAST_ERROR", "message": "Not enough energy"}
+```
+
+### `match_history`
+
+```json
+{
+  "type": "match_history",
+  "matches": [
+    {"match_id": "...", "player1_id": "...", "player2_id": "...", "winner": 1, "started_at": 0, "ended_at": 0, "duration_ms": 0}
+  ]
+}
+```
+
+### `leaderboard`
+
+```json
+{
+  "type": "leaderboard",
+  "entries": [
+    {"rank": 1, "player_id": "g_123", "display_name": "Pro Player", "matches_won": 50, "rating": 1250}
+  ]
+}
+```
+
+### `player_stats`
+
+```json
+{
+  "type": "player_stats",
+  "stats": {
+    "player_id": "g_123",
+    "display_name": "Player",
+    "matches_played": 100,
+    "matches_won": 50,
+    "matches_lost": 50,
+    "rating": 1000,
+    "created_at": 0,
+    "updated_at": 0
+  }
+}
+```
+
+## Typical Godot Client Flow
+
+```
+1. Google Sign-In → get id_token
+2. Connect WebSocket to wss://sg.vangambit.com/ws
+3. Receive: {"type": "connected", "player_id": "anon_xxx"}
+4. Send: {"type": "authenticate", "id_token": "..."}
+5. Receive: {"type": "authenticated", "player_id": "g_xxx", ...}
+6. Send: {"type": "queue_matchmaking", "hero_slug_1": "...", ...}
+7. Receive: {"type": "matchmaking_queued"}
+8. Wait...
+9. Receive: {"type": "match_found", "match_id": "...", "team": 1}
+10. Receive: {"type": "state_update", ...}  (continuous during match)
+11. Send: {"type": "cast_action", ...}  or  {"type": "reroll_hand", ...}
+12. Match ends when state_update shows phase=3 and winner!=0
+```
+
+## Available Heroes
+
+iron-knight, arc-strider, necromancer, spellblade-empress, earth-warden, dawn-priest, flame-warlock, blood-alchemist, gunslinger, night-venom, princess-emberheart, demon-empress, tyrant-overlord, arcane-paladin, storm-ranger, wind-monk, frost-queen
 
 ## Current Simplifications
 
-- reroll uses a single global action pool, not per-player deckbuilding
-- matchmaking is first-in-first-matched and has no rating/MMR yet
-- action targeting is single-target only
-- there is no interruption system yet
-- hard status handling is minimal
-- shield is implemented as a timed status bucket
-- `create_match()` does not return `match_id`; the client must discover it by subscription
+- Reroll uses a single global action pool, not per-player deckbuilding
+- Matchmaking is first-in-first-matched, no rating/MMR
+- Action targeting is auto-resolved (no manual target selection by client)
+- No interruption system
+- Shield is implemented as a timed status
