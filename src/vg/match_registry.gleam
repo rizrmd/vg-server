@@ -3,13 +3,13 @@ import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
-import sqlight
+import pog
 import vg/match.{type Message as MatchMessage}
 
 pub type MatchRegistry {
   MatchRegistry(
     matches: Dict(String, Subject(MatchMessage)),
-    db_conn: Option(sqlight.Connection),
+    db_conn: Option(pog.Connection),
   )
 }
 
@@ -24,7 +24,7 @@ pub type Message {
   )
   RemoveMatch(match_id: String, reply_to: Subject(Nil))
   ListMatches(reply_to: Subject(List(String)))
-  SetDbConn(conn: sqlight.Connection, reply_to: Subject(Nil))
+  SetDbConn(conn: pog.Connection, reply_to: Subject(Nil))
 }
 
 pub fn start() {
@@ -129,7 +129,7 @@ pub fn list_matches(registry: Subject(Message)) -> List(String) {
   })
 }
 
-pub fn set_db_conn(registry: Subject(Message), conn: sqlight.Connection) -> Nil {
+pub fn set_db_conn(registry: Subject(Message), conn: pog.Connection) -> Nil {
   process.call(registry, waiting: 5000, sending: fn(subject) {
     SetDbConn(conn, subject)
   })

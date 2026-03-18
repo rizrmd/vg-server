@@ -8,7 +8,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/otp/static_supervisor as supervisor
 import mist.{type Connection, type ResponseData}
-import sqlight
+import pog
 import vg/connection_registry
 import vg/db
 import vg/match_orchestrator
@@ -19,29 +19,39 @@ import vg/websocket
 
 const default_port = 7567
 
-const default_db_path = "vg_server.db"
+const default_db_url = "postgres://postgres:6LP0Ojegy7IUU6kaX9lLkmZRUiAdAUNOltWyL3LegfYGR6rPQtB4DUSVqjdA78ES@107.155.75.50:5986"
+
+fn get_env(name: String, default: String) -> String {
+  case do_get_env(name) {
+    Ok(value) -> value
+    Error(_) -> default
+  }
+}
+
+@external(erlang, "vg_server_ffi", "get_env")
+fn do_get_env(name: String) -> Result(String, Nil)
 
 pub fn main() {
   io.println("Starting Vanguard's Gambit Server...")
 
-  let db_path = default_db_path
+  let db_url = get_env("DATABASE_URL", default_db_url)
 
-  io.println("Initializing database at: " <> db_path)
-  let db_result = db.init(db_path)
+  io.println("Connecting to PostgreSQL database...")
+  let db_result = db.init(db_url)
   case db_result {
     Ok(conn) -> {
       io.println("Database initialized successfully")
       start_server_with_db(conn)
     }
     Error(err) -> {
-      io.println("Failed to initialize database: " <> err.message)
+      io.println("Failed to initialize database: " <> err)
       // Start without database
       start_server_without_db()
     }
   }
 }
 
-fn start_server_with_db(conn: sqlight.Connection) {
+fn start_server_with_db(conn: pog.Connection) {
   // Start registries
   let assert Ok(actor.Started(pid: _, data: player_registry)) =
     player_registry.start()
@@ -107,7 +117,7 @@ fn run_server(
   matchmaking_queue: process.Subject(matchmaking.Message),
   match_registry: process.Subject(match_registry.Message),
   conn_registry: process.Subject(connection_registry.Message),
-  db_conn: Result(sqlight.Connection, Nil),
+  db_conn: Result(pog.Connection, Nil),
 ) {
   let assert Ok(actor.Started(pid: _, data: orchestrator)) =
     match_orchestrator.start(matchmaking_queue, match_registry, conn_registry)
@@ -130,7 +140,10 @@ fn run_server(
     Ok(conn) -> Some(conn)
     Error(_) -> None
   }
-  let server_port = default_port
+  let server_port = case int.parse(get_env("PORT", "")) {
+    Ok(p) -> p
+    Error(_) -> default_port
+  }
   let assert Ok(_) =
     start_http_server(
       player_registry,
@@ -166,7 +179,7 @@ fn start_http_server(
   matchmaking_queue: process.Subject(matchmaking.Message),
   match_registry: process.Subject(match_registry.Message),
   conn_registry: process.Subject(connection_registry.Message),
-  db_conn: Option(sqlight.Connection),
+  db_conn: Option(pog.Connection),
   port: Int,
 ) {
   let handler = fn(req: Request(Connection)) -> Response(ResponseData) {

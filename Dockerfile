@@ -21,19 +21,12 @@ FROM erlang:27-alpine
 
 WORKDIR /app
 
-# Install required packages
-RUN apk add --no-cache sqlite-libs
-
 # Copy built application from builder
 COPY --from=builder /app/build/ ./build/
-COPY --from=builder /app/gleam.toml ./
-
-# Create data directory for SQLite
-RUN mkdir -p /data
 
 # Set environment variables
 ENV PORT=3000
-ENV DB_PATH=/data/vg_server.db
+ENV DATABASE_URL=""
 
 # Expose the WebSocket port
 EXPOSE 3000

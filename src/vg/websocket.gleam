@@ -6,7 +6,7 @@ import gleam/http/response.{type Response}
 import gleam/int
 import gleam/option.{type Option, None, Some}
 import mist.{type ResponseData}
-import sqlight
+import pog
 import vg/connection_registry
 import vg/db
 import vg/game_json.{
@@ -32,7 +32,7 @@ pub type WsState {
     connection_registry: Subject(connection_registry.Message),
     current_match_id: Option(String),
     current_team: Option(Int),
-    db_conn: Option(sqlight.Connection),
+    db_conn: Option(pog.Connection),
     ws_conn: Option(mist.WebsocketConnection),
     // Store for reconnect/re-register
   )
@@ -44,7 +44,7 @@ pub fn handle_websocket(
   matchmaking: Subject(matchmaking.Message),
   match_registry: Subject(match_registry.Message),
   connection_registry: Subject(connection_registry.Message),
-  db_conn: Option(sqlight.Connection),
+  db_conn: Option(pog.Connection),
 ) -> Response(ResponseData) {
   mist.websocket(
     request: req,
@@ -75,7 +75,7 @@ fn on_init(
   matchmaking: Subject(matchmaking.Message),
   match_registry: Subject(match_registry.Message),
   connection_registry: Subject(connection_registry.Message),
-  db_conn: Option(sqlight.Connection),
+  db_conn: Option(pog.Connection),
 ) {
   let player_id = "player_" <> int.to_string(int.random(1_000_000))
   let state =

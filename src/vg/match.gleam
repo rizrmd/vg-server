@@ -5,7 +5,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
-import sqlight
+import pog
 import vg/content
 import vg/db
 import vg/match_logic
@@ -26,7 +26,7 @@ pub type MatchActorState {
     hand_slots: List(MatchHandSlot),
     statuses: Dict(String, MatchStatus),
     casts: Dict(String, MatchCast),
-    db_conn: Option(sqlight.Connection),
+    db_conn: Option(pog.Connection),
     match_saved: Bool,
     // Track if we've already saved this match to DB
   )
@@ -82,7 +82,7 @@ pub fn start(
 pub fn start_with_db(
   match_id: String,
   created_at: Int,
-  db_conn: Option(sqlight.Connection),
+  db_conn: Option(pog.Connection),
 ) -> Result(actor.Started(Subject(Message)), actor.StartError) {
   let initial_state =
     MatchActorState(
