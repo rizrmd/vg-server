@@ -13,22 +13,16 @@ RUN gleam deps download
 COPY src/ ./src/
 COPY test/ ./test/
 
-# Build the project
-RUN gleam build --target erlang
-
-# Collect all beam/app files into a single ebin directory
-RUN mkdir -p /app/ebin && \
-    for dir in build/dev/erlang/*/ebin; do \
-      cp "$dir"/* /app/ebin/ 2>/dev/null || true; \
-    done
+# Build the project and create an erlang shipment
+RUN gleam export erlang-shipment
 
 # Production stage
 FROM erlang:27-alpine
 
 WORKDIR /app
 
-# Copy consolidated ebin from builder
-COPY --from=builder /app/ebin/ ./ebin/
+# Copy the erlang shipment
+COPY --from=builder /app/build/erlang-shipment/ ./
 
 # Set environment variables
 ENV PORT=3000
@@ -37,5 +31,6 @@ ENV DATABASE_URL=""
 # Expose the WebSocket port
 EXPOSE 3000
 
-# Run the server
-CMD ["erl", "-pa", "ebin", "-noshell", "-eval", "'vg_server@@main':run(vg_server)"]
+# Run the server using the shipment entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["run"]
