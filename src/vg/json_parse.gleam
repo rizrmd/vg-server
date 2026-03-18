@@ -3,7 +3,7 @@ import gleam/int
 import gleam/result
 import gleam/string
 import vg/game_json.{
-  type ClientMessage, CastAction, GetLeaderboard, GetMatchHistory,
+  type ClientMessage, Authenticate, CastAction, GetLeaderboard, GetMatchHistory,
   GetPlayerStats, LeaveMatch, QueueMatchmaking, RerollHand, UpsertProfile,
 }
 
@@ -12,6 +12,10 @@ pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
   use msg_type <- result.try(get_json_string_field(json_str, "type"))
 
   case msg_type {
+    "authenticate" -> {
+      use id_token <- result.try(get_json_string_field(json_str, "id_token"))
+      Ok(Authenticate(id_token: id_token))
+    }
     "upsert_profile" -> {
       use display_name <- result.try(get_json_string_field(
         json_str,

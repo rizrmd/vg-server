@@ -10,12 +10,13 @@ import pog
 import vg/connection_registry
 import vg/db
 import vg/game_json.{
-  type ClientMessage, type ServerMessage, CastAction, Connected,
-  Error as ServerError, GetLeaderboard, GetMatchHistory, GetPlayerStats,
-  Leaderboard, LeaveMatch, MatchFound, MatchHistory, MatchmakingQueued,
-  PlayerStatsResponse, ProfileUpdated, QueueMatchmaking, RerollHand, StateUpdate,
-  UpsertProfile,
+  type ClientMessage, type ServerMessage, Authenticate, AuthError,
+  Authenticated, CastAction, Connected, Error as ServerError, GetLeaderboard,
+  GetMatchHistory, GetPlayerStats, Leaderboard, LeaveMatch, MatchFound,
+  MatchHistory, MatchmakingQueued, PlayerStatsResponse, ProfileUpdated,
+  QueueMatchmaking, RerollHand, StateUpdate, UpsertProfile,
 }
+import vg/google_auth
 import vg/json_parse
 import vg/match
 import vg/match_registry
@@ -26,6 +27,8 @@ import vg/player_registry
 pub type WsState {
   WsState(
     player_id: String,
+    authenticated: Bool,
+    google_client_id: String,
     player_registry: Subject(player_registry.Message),
     matchmaking: Subject(matchmaking.Message),
     match_registry: Subject(match_registry.Message),
@@ -34,7 +37,6 @@ pub type WsState {
     current_team: Option(Int),
     db_conn: Option(pog.Connection),
     ws_conn: Option(mist.WebsocketConnection),
-    // Store for reconnect/re-register
   )
 }
 
@@ -45,6 +47,7 @@ pub fn handle_websocket(
   match_registry: Subject(match_registry.Message),
   connection_registry: Subject(connection_registry.Message),
   db_conn: Option(pog.Connection),
+  google_client_id: String,
 ) -> Response(ResponseData) {
   mist.websocket(
     request: req,
@@ -57,6 +60,7 @@ pub fn handle_websocket(
         match_registry,
         connection_registry,
         db_conn,
+        google_client_id,
       )
     },
     on_close: fn(state) {
@@ -76,11 +80,14 @@ fn on_init(
   match_registry: Subject(match_registry.Message),
   connection_registry: Subject(connection_registry.Message),
   db_conn: Option(pog.Connection),
+  google_client_id: String,
 ) {
-  let player_id = "player_" <> int.to_string(int.random(1_000_000))
+  let temp_id = "anon_" <> int.to_string(int.random(1_000_000))
   let state =
     WsState(
-      player_id: player_id,
+      player_id: temp_id,
+      authenticated: False,
+      google_client_id: google_client_id,
       player_registry: player_registry,
       matchmaking: matchmaking,
       match_registry: match_registry,
@@ -91,10 +98,7 @@ fn on_init(
       ws_conn: Some(conn),
     )
 
-  // Register connection for match notifications
-  connection_registry.register_connection(connection_registry, player_id, conn)
-
-  send_server_message(conn, Connected(player_id))
+  send_server_message(conn, Connected(temp_id))
   #(state, None)
 }
 
@@ -126,6 +130,106 @@ fn handle_client_message(
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case msg {
+    Authenticate(id_token) -> handle_authenticate(state, id_token, conn)
+    _ -> {
+      case state.authenticated {
+        False -> {
+          send_server_message(
+            conn,
+            AuthError("NOT_AUTHENTICATED", "Send authenticate message first"),
+          )
+          mist.continue(state)
+        }
+        True -> handle_authenticated_message(state, msg, conn)
+      }
+    }
+  }
+}
+
+fn handle_authenticate(
+  state: WsState,
+  id_token: String,
+  conn: mist.WebsocketConnection,
+) -> mist.Next(WsState, String) {
+  case state.db_conn {
+    None -> {
+      send_server_message(
+        conn,
+        AuthError("NO_DB", "Database not available for authentication"),
+      )
+      mist.continue(state)
+    }
+    Some(db_conn) -> {
+      case
+        google_auth.verify_google_token(id_token, state.google_client_id)
+      {
+        Ok(token_info) -> {
+          let now = get_timestamp()
+          case
+            db.get_or_create_google_player(
+              db_conn,
+              token_info.sub,
+              token_info.email,
+              token_info.name,
+              token_info.picture,
+              now,
+            )
+          {
+            Ok(player) -> {
+              // Register connection with persistent player_id
+              connection_registry.register_connection(
+                state.connection_registry,
+                player.player_id,
+                conn,
+              )
+              // Also set up player profile
+              let _ =
+                player_registry.upsert_profile(
+                  state.player_registry,
+                  player.player_id,
+                  player.display_name,
+                )
+              send_server_message(
+                conn,
+                Authenticated(
+                  player.player_id,
+                  player.display_name,
+                  player.email,
+                ),
+              )
+              mist.continue(
+                WsState(
+                  ..state,
+                  player_id: player.player_id,
+                  authenticated: True,
+                ),
+              )
+            }
+            Error(_) -> {
+              send_server_message(
+                conn,
+                AuthError("DB_ERROR", "Failed to create player account"),
+              )
+              mist.continue(state)
+            }
+          }
+        }
+        Error(err) -> {
+          send_server_message(conn, AuthError("INVALID_TOKEN", err))
+          mist.continue(state)
+        }
+      }
+    }
+  }
+}
+
+fn handle_authenticated_message(
+  state: WsState,
+  msg: ClientMessage,
+  conn: mist.WebsocketConnection,
+) -> mist.Next(WsState, String) {
+  case msg {
+    Authenticate(_) -> mist.continue(state)
     UpsertProfile(display_name) -> {
       case
         player_registry.upsert_profile(
@@ -385,3 +489,10 @@ pub fn notify_match_found(
 ) -> Nil {
   send_server_message(conn, MatchFound(match_id, team))
 }
+
+fn get_timestamp() -> Int {
+  do_get_timestamp()
+}
+
+@external(erlang, "erlang", "system_time")
+fn do_get_timestamp() -> Int

@@ -15,6 +15,7 @@ import vg/types.{
 // ============================================================================
 
 pub type ClientMessage {
+  Authenticate(id_token: String)
   UpsertProfile(display_name: String)
   QueueMatchmaking(
     hero_slug_1: String,
@@ -35,6 +36,8 @@ pub type ClientMessage {
 
 pub type ServerMessage {
   Connected(player_id: String)
+  Authenticated(player_id: String, display_name: String, email: String)
+  AuthError(code: String, message: String)
   ProfileUpdated(profile: PlayerProfile)
   MatchmakingQueued
   MatchmakingLeft
@@ -65,6 +68,19 @@ pub fn encode_server_message(msg: ServerMessage) -> String {
       json.object([
         #("type", json.string("connected")),
         #("player_id", json.string(player_id)),
+      ])
+    Authenticated(player_id, display_name, email) ->
+      json.object([
+        #("type", json.string("authenticated")),
+        #("player_id", json.string(player_id)),
+        #("display_name", json.string(display_name)),
+        #("email", json.string(email)),
+      ])
+    AuthError(code, message) ->
+      json.object([
+        #("type", json.string("auth_error")),
+        #("code", json.string(code)),
+        #("message", json.string(message)),
       ])
     ProfileUpdated(profile) ->
       json.object([

@@ -34,6 +34,19 @@ pub type PlayerStats {
   )
 }
 
+// Player account (Google auth)
+pub type Player {
+  Player(
+    player_id: String,
+    google_sub: String,
+    email: String,
+    display_name: String,
+    avatar_url: String,
+    created_at: Int,
+    updated_at: Int,
+  )
+}
+
 // Leaderboard entry
 pub type LeaderboardEntry {
   LeaderboardEntry(
@@ -90,6 +103,24 @@ pub fn init(db_url: String) -> Result(pog.Connection, String) {
             Error(_) -> Nil
           }
 
+          // Create players table
+          let players_sql =
+            "
+            CREATE TABLE IF NOT EXISTS players (
+              player_id TEXT PRIMARY KEY,
+              google_sub TEXT UNIQUE NOT NULL,
+              email TEXT,
+              display_name TEXT NOT NULL,
+              avatar_url TEXT,
+              created_at BIGINT NOT NULL,
+              updated_at BIGINT NOT NULL
+            )
+          "
+          case pog.query(players_sql) |> pog.execute(conn) {
+            Ok(_) -> Nil
+            Error(_) -> Nil
+          }
+
           // Create indexes
           let indexes = [
             "CREATE INDEX IF NOT EXISTS idx_match_results_player1 ON match_results(player1_id)",
@@ -97,6 +128,7 @@ pub fn init(db_url: String) -> Result(pog.Connection, String) {
             "CREATE INDEX IF NOT EXISTS idx_match_results_ended_at ON match_results(ended_at)",
             "CREATE INDEX IF NOT EXISTS idx_player_stats_rating ON player_stats(rating DESC)",
             "CREATE INDEX IF NOT EXISTS idx_player_stats_wins ON player_stats(matches_won DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_players_google_sub ON players(google_sub)",
           ]
           list.each(indexes, fn(sql) {
             case pog.query(sql) |> pog.execute(conn) {
@@ -427,5 +459,69 @@ pub fn get_player_rank(
   case resp.rows {
     [rank, ..] -> Ok(Some(rank))
     [] -> Ok(None)
+  }
+}
+
+// ============================================================================
+// Player account functions (Google auth)
+// ============================================================================
+
+fn player_decoder() -> Decoder(Player) {
+  use player_id <- decode.field(0, decode.string)
+  use google_sub <- decode.field(1, decode.string)
+  use email <- decode.field(2, decode.string)
+  use display_name <- decode.field(3, decode.string)
+  use avatar_url <- decode.field(4, decode.string)
+  use created_at <- decode.field(5, decode.int)
+  use updated_at <- decode.field(6, decode.int)
+  decode.success(Player(
+    player_id: player_id,
+    google_sub: google_sub,
+    email: email,
+    display_name: display_name,
+    avatar_url: avatar_url,
+    created_at: created_at,
+    updated_at: updated_at,
+  ))
+}
+
+/// Find or create a player by Google sub. Updates display_name/email/avatar on each login.
+pub fn get_or_create_google_player(
+  conn: pog.Connection,
+  google_sub: String,
+  email: String,
+  display_name: String,
+  avatar_url: String,
+  now: Int,
+) -> Result(Player, pog.QueryError) {
+  let player_id = "g_" <> google_sub
+  let sql =
+    "
+    INSERT INTO players (player_id, google_sub, email, display_name, avatar_url, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (google_sub) DO UPDATE SET
+      display_name = EXCLUDED.display_name,
+      email = EXCLUDED.email,
+      avatar_url = EXCLUDED.avatar_url,
+      updated_at = EXCLUDED.updated_at
+    RETURNING player_id, google_sub, email, display_name, avatar_url, created_at, updated_at
+  "
+
+  use resp <- result.try(
+    pog.query(sql)
+    |> pog.parameter(pog.text(player_id))
+    |> pog.parameter(pog.text(google_sub))
+    |> pog.parameter(pog.text(email))
+    |> pog.parameter(pog.text(display_name))
+    |> pog.parameter(pog.text(avatar_url))
+    |> pog.parameter(pog.int(now))
+    |> pog.parameter(pog.int(now))
+    |> pog.returning(player_decoder())
+    |> pog.execute(conn),
+  )
+
+  case resp.rows {
+    [player, ..] -> Ok(player)
+    [] -> Error(pog.ConnectionUnavailable)
   }
 }

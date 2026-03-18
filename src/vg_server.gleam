@@ -144,6 +144,7 @@ fn run_server(
     Ok(p) -> p
     Error(_) -> default_port
   }
+  let google_client_id = get_env("GOOGLE_CLIENT_ID", "")
   let assert Ok(_) =
     start_http_server(
       player_registry,
@@ -152,6 +153,7 @@ fn run_server(
       conn_registry,
       opt_conn,
       server_port,
+      google_client_id,
     )
   io.println(
     "WebSocket server listening on port " <> int.to_string(server_port),
@@ -181,6 +183,7 @@ fn start_http_server(
   conn_registry: process.Subject(connection_registry.Message),
   db_conn: Option(pog.Connection),
   port: Int,
+  google_client_id: String,
 ) {
   let handler = fn(req: Request(Connection)) -> Response(ResponseData) {
     case request.path_segments(req) {
@@ -192,6 +195,7 @@ fn start_http_server(
           match_registry,
           conn_registry,
           db_conn,
+          google_client_id,
         )
       _ -> {
         response.new(200)
