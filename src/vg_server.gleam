@@ -225,60 +225,144 @@ fn sign_in_test_page(client_id: String) -> String {
   <script src=\"https://accounts.google.com/gsi/client\" async defer></script>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
-    pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
     .log { margin-top: 20px; }
-    .log div { padding: 4px 0; border-bottom: 1px solid #eee; }
+    .log div { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 14px; }
     .ok { color: green; } .err { color: red; } .info { color: #666; }
     button { padding: 8px 16px; margin: 4px; cursor: pointer; }
     h1 { font-size: 1.4em; }
+    .profile { background: #f0f7f0; border: 1px solid #c3e6c3; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .profile h3 { margin: 0 0 8px 0; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <h1>VG Server - Google Sign-In Test</h1>
-  <div id=\"g_id_onload\"
-    data-client_id=\"" <> client_id <> "\"
-    data-callback=\"onSignIn\"
-    data-auto_prompt=\"false\">
+
+  <div id=\"signInSection\">
+    <div id=\"g_id_onload\"
+      data-client_id=\"" <> client_id <> "\"
+      data-callback=\"onSignIn\"
+      data-auto_prompt=\"false\">
+    </div>
+    <div class=\"g_id_signin\" data-type=\"standard\" data-size=\"large\"></div>
   </div>
-  <div class=\"g_id_signin\" data-type=\"standard\" data-size=\"large\"></div>
-  <div style=\"margin-top:16px\">
-    <button onclick=\"connectWs()\">1. Connect WebSocket</button>
-    <button onclick=\"sendAuth()\" id=\"authBtn\" disabled>2. Authenticate</button>
+
+  <div id=\"profileSection\" class=\"profile hidden\">
+    <h3 id=\"profileName\"></h3>
+    <div id=\"profileInfo\" style=\"font-size:14px;color:#555\"></div>
+    <button onclick=\"logout()\" style=\"margin-top:8px;background:#f44;color:#fff;border:none;border-radius:4px\">Logout</button>
   </div>
+
+  <div style=\"margin-top:16px\" id=\"controls\" class=\"hidden\">
+    <button onclick=\"connectAndAuth()\">Connect &amp; Authenticate</button>
+    <span id=\"wsStatus\" style=\"font-size:13px;color:#999\"></span>
+  </div>
+
   <div class=\"log\" id=\"log\"></div>
+
   <script>
-    let ws = null, idToken = null;
+    let ws = null, idToken = null, authenticated = false;
+
     const log = (msg, cls) => {
       const d = document.createElement('div');
       d.className = cls || 'info';
       d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
       document.getElementById('log').prepend(d);
     };
+
+    function showProfile(data) {
+      document.getElementById('signInSection').classList.add('hidden');
+      document.getElementById('profileSection').classList.remove('hidden');
+      document.getElementById('controls').classList.remove('hidden');
+      document.getElementById('profileName').textContent = data.display_name;
+      document.getElementById('profileInfo').textContent = data.email + ' | ' + data.player_id;
+      localStorage.setItem('vg_auth', JSON.stringify(data));
+    }
+
+    function hideProfile() {
+      document.getElementById('signInSection').classList.remove('hidden');
+      document.getElementById('profileSection').classList.add('hidden');
+      document.getElementById('controls').classList.add('hidden');
+    }
+
+    // Check localStorage on load
+    const saved = localStorage.getItem('vg_auth');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        showProfile(data);
+        log('Restored session: ' + data.display_name + ' (' + data.player_id + ')', 'ok');
+      } catch(e) { localStorage.removeItem('vg_auth'); }
+    }
+
     function onSignIn(response) {
       idToken = response.credential;
+      localStorage.setItem('vg_id_token', idToken);
       log('Got Google ID token (' + idToken.length + ' chars)', 'ok');
-      document.getElementById('authBtn').disabled = false;
+      document.getElementById('controls').classList.remove('hidden');
+      connectAndAuth();
     }
-    function connectWs() {
+
+    function connectAndAuth() {
+      const token = idToken || localStorage.getItem('vg_id_token');
+      if (!token) return log('No Google token. Please sign in first.', 'err');
+      idToken = token;
+
+      if (ws && ws.readyState === 1) {
+        sendAuth();
+        return;
+      }
+
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(proto + '//' + location.host + '/ws');
-      ws.onopen = () => log('WebSocket connected', 'ok');
-      ws.onclose = () => log('WebSocket closed', 'err');
+      document.getElementById('wsStatus').textContent = 'connecting...';
+
+      ws.onopen = () => {
+        log('WebSocket connected', 'ok');
+        document.getElementById('wsStatus').textContent = 'connected';
+        sendAuth();
+      };
+      ws.onclose = () => {
+        log('WebSocket closed', 'err');
+        document.getElementById('wsStatus').textContent = 'disconnected';
+        authenticated = false;
+      };
       ws.onmessage = (e) => {
         log('Server: ' + e.data, 'info');
         try {
           const msg = JSON.parse(e.data);
-          if (msg.type === 'authenticated') log('Authenticated as ' + msg.player_id + ' (' + msg.display_name + ')', 'ok');
-          if (msg.type === 'auth_error') log('Auth error: ' + msg.message, 'err');
+          if (msg.type === 'authenticated') {
+            authenticated = true;
+            showProfile(msg);
+            log('Authenticated as ' + msg.player_id + ' (' + msg.display_name + ')', 'ok');
+          }
+          if (msg.type === 'auth_error') {
+            log('Auth error: ' + msg.message, 'err');
+            // Token might be expired, clear it
+            localStorage.removeItem('vg_id_token');
+            idToken = null;
+          }
         } catch(e) {}
       };
     }
+
     function sendAuth() {
       if (!ws || ws.readyState !== 1) return log('WebSocket not connected', 'err');
-      if (!idToken) return log('No Google token yet', 'err');
-      const msg = JSON.stringify({type: 'authenticate', id_token: idToken});
-      ws.send(msg);
+      if (!idToken) return log('No Google token', 'err');
+      ws.send(JSON.stringify({type: 'authenticate', id_token: idToken}));
       log('Sent authenticate message', 'info');
+    }
+
+    function logout() {
+      localStorage.removeItem('vg_auth');
+      localStorage.removeItem('vg_id_token');
+      idToken = null;
+      authenticated = false;
+      if (ws) { ws.close(); ws = null; }
+      hideProfile();
+      log('Logged out', 'info');
+      // Revoke Google session
+      google.accounts.id.disableAutoSelect();
     }
   </script>
 </body>
