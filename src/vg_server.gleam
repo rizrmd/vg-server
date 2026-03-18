@@ -202,5 +202,6 @@ fn start_http_server(
 
   mist.new(handler)
   |> mist.port(port)
+  |> mist.bind("0.0.0.0")
   |> mist.start()
 }
