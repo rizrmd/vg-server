@@ -47,16 +47,20 @@ docker run -p 3000:3000 vg-server
 ## Key Design Decisions
 
 - **All runtime match state lives in OTP actors** (not persisted). Matches are lost on restart. Only results/stats go to PostgreSQL.
-- **No authentication** — random player_id assigned on WebSocket connect.
+- **Google Sign-In required** — clients must authenticate via Google ID token before gameplay. Player accounts stored in `players` table with persistent `g_<google_sub>` IDs.
 - **Static content** is hardcoded in `content.gleam`, not loaded from DB or files.
 - **JSON protocol** over WebSocket (MessagePack via glepack is available but not primary).
 - **Game constants** are in `match_logic.gleam`: max_energy=10, energy_regen=1/sec, reroll_cost=2, hand_size=5, heroes_per_team=3.
 
 ## WebSocket Protocol
 
-Client messages use `{"type": "..."}` format. Key types: `upsert_profile`, `queue_matchmaking`, `cast_action`, `reroll_hand`, `leave_match`, `get_match_history`, `get_leaderboard`, `get_player_stats`.
+Client messages use `{"type": "..."}` format:
+- **Auth (must be first)**: `authenticate` (with `id_token` from Google Sign-In)
+- **Gameplay**: `upsert_profile`, `queue_matchmaking`, `cast_action`, `reroll_hand`, `leave_match`, `get_match_history`, `get_leaderboard`, `get_player_stats`
 
-Server pushes: `connected`, `state_update`, `event`, `error`, `match_found`, `matchmaking_queued`.
+Server pushes: `connected`, `authenticated`, `auth_error`, `state_update`, `event`, `error`, `match_found`, `matchmaking_queued`.
+
+All gameplay messages are blocked until the client sends a valid `authenticate` message.
 
 ## Deployment
 
@@ -65,33 +69,35 @@ Server pushes: `connected`, `state_update`, `event`, `error`, `match_found`, `ma
 **Live URL**: `https://sg.vangambit.com` (WebSocket at `wss://sg.vangambit.com/ws`)
 
 **Environment variables** (read in `vg_server.gleam` via `vg_server_ffi.erl`):
-- `DATABASE_URL` — PostgreSQL connection string with db name (e.g. `postgres://user:pass@host:port/dbname`). Falls back to hardcoded default.
+- `DATABASE_URL` — PostgreSQL connection string (e.g. `postgres://user:pass@host:port/dbname`). Falls back to hardcoded default.
 - `PORT` — HTTP/WebSocket listen port (falls back to 7567, Docker default is 3000)
+- `GOOGLE_CLIENT_ID` — Google OAuth client ID for Sign-In token verification
 
-**How to deploy** (via Coolify API from the server):
+**How to deploy** (push to master, then trigger via Coolify API):
 ```bash
-# SSH into the server
-ssh riz@cf.avolut.com
+# 1. Push your changes
+git push origin master
 
-# Trigger a deploy (pulls latest from master, builds Dockerfile, deploys)
-docker exec coolify curl -s \
-  "http://localhost:8080/api/v1/deploy?uuid=nw8g4co0skk488ss000k44ok&force=true" \
-  -H "Authorization: Bearer 11|mydeploytoken123456"
+# 2. SSH into the server and trigger deploy (one-liner from local machine)
+ssh riz@cf.avolut.com 'docker exec coolify curl -s "http://localhost:8080/api/v1/deploy?uuid=nw8g4co0skk488ss000k44ok&force=true" -H "Authorization: Bearer 11|mydeploytoken123456"'
 ```
 
-Coolify auto-builds from `rizrmd/vg-server` master branch using the Dockerfile. Push to master then trigger deploy.
+Coolify pulls latest from `rizrmd/vg-server` master, builds the Dockerfile, and deploys.
 
 **Check deployment status**:
 ```bash
 # Replace DEPLOY_UUID with the uuid from the deploy response
-docker exec coolify curl -s \
-  "http://localhost:8080/api/v1/deployments/DEPLOY_UUID" \
-  -H "Authorization: Bearer 11|mydeploytoken123456" | python3 -m json.tool
+ssh riz@cf.avolut.com 'docker exec coolify curl -s "http://localhost:8080/api/v1/deployments/DEPLOY_UUID" -H "Authorization: Bearer 11|mydeploytoken123456"'
 ```
 
 **Check running container logs**:
 ```bash
-docker logs nw8g4co0skk488ss000k44ok
+ssh riz@cf.avolut.com "docker logs nw8g4co0skk488ss000k44ok"
+```
+
+**Add/update env vars**:
+```bash
+ssh riz@cf.avolut.com 'docker exec coolify curl -s -X POST "http://localhost:8080/api/v1/applications/nw8g4co0skk488ss000k44ok/envs" -H "Authorization: Bearer 11|mydeploytoken123456" -H "Content-Type: application/json" -d "{\"key\":\"VAR_NAME\",\"value\":\"VAR_VALUE\",\"is_runtime\":true,\"is_buildtime\":false}"'
 ```
 
 **Dockerfile notes**:
@@ -99,6 +105,9 @@ docker logs nw8g4co0skk488ss000k44ok
 - Runtime: `erlang:28-alpine` — must match builder OTP version
 - Uses `gleam export erlang-shipment` for proper OTP boot with all dependencies
 - Exposes port 3000, Traefik routes `sg.vangambit.com` to it
+
+**Test pages**:
+- `https://sg.vangambit.com/sign-in/test` — Google Sign-In + WebSocket auth test
 
 ## Gleam Language Notes
 
