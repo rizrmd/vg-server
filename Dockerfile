@@ -38,4 +38,4 @@ ENV DATABASE_URL=""
 EXPOSE 3000
 
 # Run the server
-CMD ["erl", "-pa", "ebin", "-noshell", "-eval", "application:start(compiler), application:start(vg_server)"]
+CMD ["erl", "-pa", "ebin", "-noshell", "-eval", "'vg_server@@main':run(vg_server)"]
