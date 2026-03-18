@@ -16,13 +16,17 @@ COPY test/ ./test/
 # Build the project
 RUN gleam build --target erlang
 
+# Collect all ebin directories into a flat structure for easy -pa glob
+RUN mkdir -p /app/ebin && \
+    find build/dev/erlang -name 'ebin' -type d -exec cp -r {}/* /app/ebin/ \;
+
 # Production stage
 FROM erlang:27-alpine
 
 WORKDIR /app
 
-# Copy built application from builder
-COPY --from=builder /app/build/ ./build/
+# Copy consolidated ebin from builder
+COPY --from=builder /app/ebin/ ./ebin/
 
 # Set environment variables
 ENV PORT=3000
@@ -32,4 +36,4 @@ ENV DATABASE_URL=""
 EXPOSE 3000
 
 # Run the server
-CMD ["erl", "-pa", "build/erlang/ebin", "-noshell", "-eval", "application:start(compiler), application:start(vg_server)"]
+CMD ["erl", "-pa", "ebin", "-noshell", "-eval", "application:start(compiler), application:start(vg_server)"]
