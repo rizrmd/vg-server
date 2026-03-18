@@ -75,14 +75,27 @@ fn parse_tokeninfo(
 }
 
 fn get_field(json: String, field: String) -> Result(String, Nil) {
-  let pattern = "\"" <> field <> "\":\""
-  case string.split_once(json, pattern) {
+  // Try "field":"value" (no space)
+  let pattern1 = "\"" <> field <> "\":\""
+  // Try "field": "value" (with space)
+  let pattern2 = "\"" <> field <> "\": \""
+  case string.split_once(json, pattern1) {
     Ok(#(_, rest)) -> {
       case string.split_once(rest, "\"") {
         Ok(#(value, _)) -> Ok(value)
         Error(_) -> Error(Nil)
       }
     }
-    Error(_) -> Error(Nil)
+    Error(_) -> {
+      case string.split_once(json, pattern2) {
+        Ok(#(_, rest)) -> {
+          case string.split_once(rest, "\"") {
+            Ok(#(value, _)) -> Ok(value)
+            Error(_) -> Error(Nil)
+          }
+        }
+        Error(_) -> Error(Nil)
+      }
+    }
   }
 }
