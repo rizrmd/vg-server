@@ -197,6 +197,13 @@ fn start_http_server(
           db_conn,
           google_client_id,
         )
+      ["sign-in", "test"] -> {
+        response.new(200)
+        |> response.set_body(
+          mist.Bytes(bytes_tree.from_string(sign_in_test_page(google_client_id))),
+        )
+        |> response.set_header("content-type", "text/html")
+      }
       _ -> {
         response.new(200)
         |> response.set_body(mist.Bytes(bytes_tree.from_string("VG Server")))
@@ -208,4 +215,72 @@ fn start_http_server(
   |> mist.port(port)
   |> mist.bind("0.0.0.0")
   |> mist.start()
+}
+
+fn sign_in_test_page(client_id: String) -> String {
+  "<!DOCTYPE html>
+<html>
+<head>
+  <title>VG Server - Google Sign-In Test</title>
+  <script src=\"https://accounts.google.com/gsi/client\" async defer></script>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+    pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+    .log { margin-top: 20px; }
+    .log div { padding: 4px 0; border-bottom: 1px solid #eee; }
+    .ok { color: green; } .err { color: red; } .info { color: #666; }
+    button { padding: 8px 16px; margin: 4px; cursor: pointer; }
+    h1 { font-size: 1.4em; }
+  </style>
+</head>
+<body>
+  <h1>VG Server - Google Sign-In Test</h1>
+  <div id=\"g_id_onload\"
+    data-client_id=\"" <> client_id <> "\"
+    data-callback=\"onSignIn\"
+    data-auto_prompt=\"false\">
+  </div>
+  <div class=\"g_id_signin\" data-type=\"standard\" data-size=\"large\"></div>
+  <div style=\"margin-top:16px\">
+    <button onclick=\"connectWs()\">1. Connect WebSocket</button>
+    <button onclick=\"sendAuth()\" id=\"authBtn\" disabled>2. Authenticate</button>
+  </div>
+  <div class=\"log\" id=\"log\"></div>
+  <script>
+    let ws = null, idToken = null;
+    const log = (msg, cls) => {
+      const d = document.createElement('div');
+      d.className = cls || 'info';
+      d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      document.getElementById('log').prepend(d);
+    };
+    function onSignIn(response) {
+      idToken = response.credential;
+      log('Got Google ID token (' + idToken.length + ' chars)', 'ok');
+      document.getElementById('authBtn').disabled = false;
+    }
+    function connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws');
+      ws.onopen = () => log('WebSocket connected', 'ok');
+      ws.onclose = () => log('WebSocket closed', 'err');
+      ws.onmessage = (e) => {
+        log('Server: ' + e.data, 'info');
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'authenticated') log('Authenticated as ' + msg.player_id + ' (' + msg.display_name + ')', 'ok');
+          if (msg.type === 'auth_error') log('Auth error: ' + msg.message, 'err');
+        } catch(e) {}
+      };
+    }
+    function sendAuth() {
+      if (!ws || ws.readyState !== 1) return log('WebSocket not connected', 'err');
+      if (!idToken) return log('No Google token yet', 'err');
+      const msg = JSON.stringify({type: 'authenticate', id_token: idToken});
+      ws.send(msg);
+      log('Sent authenticate message', 'info');
+    }
+  </script>
+</body>
+</html>"
 }
