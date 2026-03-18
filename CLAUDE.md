@@ -62,16 +62,43 @@ Server pushes: `connected`, `state_update`, `event`, `error`, `match_found`, `ma
 
 **Server**: `ssh riz@cf.avolut.com`
 **Coolify app ID**: `nw8g4co0skk488ss000k44ok`
+**Live URL**: `https://sg.vangambit.com` (WebSocket at `wss://sg.vangambit.com/ws`)
 
 **Environment variables** (read in `vg_server.gleam` via `vg_server_ffi.erl`):
-- `DATABASE_URL` — PostgreSQL connection string (falls back to hardcoded default)
-- `PORT` — HTTP/WebSocket listen port (falls back to 7567)
+- `DATABASE_URL` — PostgreSQL connection string with db name (e.g. `postgres://user:pass@host:port/dbname`). Falls back to hardcoded default.
+- `PORT` — HTTP/WebSocket listen port (falls back to 7567, Docker default is 3000)
 
-Docker:
+**How to deploy** (via Coolify API from the server):
 ```bash
-docker build -t vg-server .
-docker run -p 3000:3000 -e DATABASE_URL="postgres://..." vg-server
+# SSH into the server
+ssh riz@cf.avolut.com
+
+# Trigger a deploy (pulls latest from master, builds Dockerfile, deploys)
+docker exec coolify curl -s \
+  "http://localhost:8080/api/v1/deploy?uuid=nw8g4co0skk488ss000k44ok&force=true" \
+  -H "Authorization: Bearer 11|mydeploytoken123456"
 ```
+
+Coolify auto-builds from `rizrmd/vg-server` master branch using the Dockerfile. Push to master then trigger deploy.
+
+**Check deployment status**:
+```bash
+# Replace DEPLOY_UUID with the uuid from the deploy response
+docker exec coolify curl -s \
+  "http://localhost:8080/api/v1/deployments/DEPLOY_UUID" \
+  -H "Authorization: Bearer 11|mydeploytoken123456" | python3 -m json.tool
+```
+
+**Check running container logs**:
+```bash
+docker logs nw8g4co0skk488ss000k44ok
+```
+
+**Dockerfile notes**:
+- Builder: `ghcr.io/gleam-lang/gleam:v1.14.0-erlang-alpine` (OTP 28)
+- Runtime: `erlang:28-alpine` — must match builder OTP version
+- Uses `gleam export erlang-shipment` for proper OTP boot with all dependencies
+- Exposes port 3000, Traefik routes `sg.vangambit.com` to it
 
 ## Gleam Language Notes
 
