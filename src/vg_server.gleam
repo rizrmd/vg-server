@@ -19,7 +19,7 @@ import vg/websocket
 
 const default_port = 7567
 
-const default_db_url = "postgres://postgres:6LP0Ojegy7IUU6kaX9lLkmZRUiAdAUNOltWyL3LegfYGR6rPQtB4DUSVqjdA78ES@107.155.75.50:5986"
+const default_db_url = "postgres://postgres:6LP0Ojegy7IUU6kaX9lLkmZRUiAdAUNOltWyL3LegfYGR6rPQtB4DUSVqjdA78ES@107.155.75.50:5986/postgres"
 
 fn get_env(name: String, default: String) -> String {
   case do_get_env(name) {
