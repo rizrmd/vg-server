@@ -194,8 +194,8 @@ fn start_http_server(
           db_conn,
         )
       _ -> {
-        response.new(404)
-        |> response.set_body(mist.Bytes(bytes_tree.from_string("Not Found")))
+        response.new(200)
+        |> response.set_body(mist.Bytes(bytes_tree.from_string("VG Server")))
       }
     }
   }
