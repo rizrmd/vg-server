@@ -17,7 +17,7 @@ COPY test/ ./test/
 RUN gleam export erlang-shipment
 
 # Production stage
-FROM erlang:27-alpine
+FROM erlang:28-alpine
 
 WORKDIR /app
 
