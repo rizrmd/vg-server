@@ -16,9 +16,11 @@ COPY test/ ./test/
 # Build the project
 RUN gleam build --target erlang
 
-# Collect all ebin directories into a flat structure for easy -pa glob
+# Collect all beam/app files into a single ebin directory
 RUN mkdir -p /app/ebin && \
-    find build/dev/erlang -name 'ebin' -type d -exec cp -r {}/* /app/ebin/ \;
+    for dir in build/dev/erlang/*/ebin; do \
+      cp "$dir"/* /app/ebin/ 2>/dev/null || true; \
+    done
 
 # Production stage
 FROM erlang:27-alpine
