@@ -4,6 +4,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/otp/static_supervisor as supervisor
@@ -204,6 +205,26 @@ fn start_http_server(
         )
         |> response.set_header("content-type", "text/html")
       }
+      ["sign-in", "desktop"] -> {
+        let port_str = case request.get_query(req) {
+          Ok(params) ->
+            case list.key_find(params, "port") {
+              Ok(p) -> p
+              Error(_) -> ""
+            }
+          Error(_) -> ""
+        }
+        response.new(200)
+        |> response.set_body(
+          mist.Bytes(
+            bytes_tree.from_string(sign_in_desktop_page(
+              google_client_id,
+              port_str,
+            )),
+          ),
+        )
+        |> response.set_header("content-type", "text/html")
+      }
       _ -> {
         response.new(200)
         |> response.set_body(mist.Bytes(bytes_tree.from_string("VG Server")))
@@ -367,4 +388,62 @@ fn sign_in_test_page(client_id: String) -> String {
   </script>
 </body>
 </html>"
+}
+
+fn sign_in_desktop_page(client_id: String, port: String) -> String {
+  case port {
+    "" ->
+      "<!DOCTYPE html><html><head><title>Error</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#111;color:#fff;}</style>
+</head><body><h2>Missing port parameter.</h2></body></html>"
+    _ ->
+      "<!DOCTYPE html>
+<html>
+<head>
+  <title>VanGambit - Sign In</title>
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <script src=\"https://accounts.google.com/gsi/client\" async defer></script>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; justify-content: center;
+      align-items: center; min-height: 100vh; margin: 0; background: #111; color: #fff; }
+    .container { text-align: center; }
+    h1 { font-size: 1.6em; margin-bottom: 24px; }
+    #status { margin-top: 16px; color: #aaa; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class=\"container\">
+    <h1>Sign in to VanGambit</h1>
+    <div id=\"signInSection\">
+      <div id=\"g_id_onload\"
+        data-client_id=\""
+      <> client_id
+      <> "\"
+        data-callback=\"onSignIn\"
+        data-auto_prompt=\"false\">
+      </div>
+      <div class=\"g_id_signin\" data-type=\"standard\" data-size=\"large\" data-theme=\"filled_black\"></div>
+    </div>
+    <div id=\"status\"></div>
+  </div>
+  <script>
+    function onSignIn(response) {
+      var idToken = response.credential;
+      var parts = idToken.split('.');
+      var payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      document.getElementById('signInSection').style.display = 'none';
+      document.getElementById('status').textContent = 'Signed in! Redirecting back to game...';
+      var params = new URLSearchParams({
+        id_token: idToken,
+        email: payload.email || '',
+        display_name: payload.name || payload.email || ''
+      });
+      window.location.href = 'http://127.0.0.1:"
+      <> port
+      <> "/callback?' + params.toString();
+    }
+  </script>
+</body>
+</html>"
+  }
 }
