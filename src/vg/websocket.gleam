@@ -14,7 +14,7 @@ import vg/game_json.{
   Authenticated, CastAction, Connected, Error as ServerError, GetLeaderboard,
   GetMatchHistory, GetPlayerStats, Leaderboard, LeaveMatch, MatchFound,
   MatchHistory, MatchmakingQueued, PlayerStatsResponse, ProfileUpdated,
-  QueueMatchmaking, RerollHand, StateUpdate, UpsertProfile,
+  QueueMatchmaking, RerollHand, StartTraining, StateUpdate, UpsertProfile,
 }
 import vg/google_auth
 import vg/json_parse
@@ -345,6 +345,10 @@ fn handle_authenticated_message(
       }
     }
 
+    StartTraining(h1, h2, h3) -> {
+      handle_start_training(state, h1, h2, h3, conn)
+    }
+
     LeaveMatch(_match_id) -> {
       send_server_message(
         conn,
@@ -441,6 +445,48 @@ fn handle_authenticated_message(
           mist.continue(state)
         }
       }
+    }
+  }
+}
+
+fn handle_start_training(
+  state: WsState,
+  h1: String,
+  h2: String,
+  h3: String,
+  conn: mist.WebsocketConnection,
+) -> mist.Next(WsState, String) {
+  let match_id =
+    "training_"
+    <> int.to_string(get_timestamp())
+    <> "_"
+    <> int.to_string(int.random(10_000))
+
+  let bot_id = "bot_passive"
+  let bot_heroes = ["flame-warlock", "dawn-priest", "earth-warden"]
+
+  case match_registry.create_match(state.match_registry, match_id) {
+    Ok(match_actor) -> {
+      let _ = match.join_match(match_actor, state.player_id, 1)
+      let _ = match.join_match(match_actor, bot_id, 2)
+      let _ =
+        match.start_match_with_heroes(match_actor, [h1, h2, h3], bot_heroes)
+
+      send_server_message(conn, MatchFound(match_id, 1))
+      mist.continue(
+        WsState(
+          ..state,
+          current_match_id: Some(match_id),
+          current_team: Some(1),
+        ),
+      )
+    }
+    Error(_) -> {
+      send_server_message(
+        conn,
+        ServerError("TRAINING_ERROR", "Failed to create training match"),
+      )
+      mist.continue(state)
     }
   }
 }

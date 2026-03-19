@@ -141,6 +141,21 @@ Costs 2 energy. Replaces the entire hand with 5 random actions.
 {"type": "get_leaderboard", "limit": 10}
 ```
 
+### `start_training`
+
+Start a training match against a passive bot (bot does nothing).
+
+```json
+{
+  "type": "start_training",
+  "hero_slug_1": "iron-knight",
+  "hero_slug_2": "arc-strider",
+  "hero_slug_3": "necromancer"
+}
+```
+
+Server responds immediately with `match_found` (no queue wait). Bot plays as team 2 with flame-warlock, dawn-priest, earth-warden.
+
 ### `get_player_stats`
 
 ```json
@@ -276,6 +291,8 @@ Full match state push. Sent after actions, periodically during match.
 
 ## Typical Godot Client Flow
 
+### PvP Match
+
 ```
 1. Google Sign-In → get id_token
 2. Connect WebSocket to wss://sg.vangambit.com/ws
@@ -291,6 +308,16 @@ Full match state push. Sent after actions, periodically during match.
 12. Match ends when state_update shows phase=3 and winner!=0
 ```
 
+### Training Match (vs Bot)
+
+```
+1. Authenticate (same as above, steps 1-5)
+2. Send: {"type": "start_training", "hero_slug_1": "...", ...}
+3. Receive: {"type": "match_found", "match_id": "training_...", "team": 1}
+4. Play normally — bot (team 2) is passive and never acts
+5. Match ends when state_update shows phase=3 and winner!=0
+```
+
 ## Available Heroes
 
 iron-knight, arc-strider, necromancer, spellblade-empress, earth-warden, dawn-priest, flame-warlock, blood-alchemist, gunslinger, night-venom, princess-emberheart, demon-empress, tyrant-overlord, arcane-paladin, storm-ranger, wind-monk, frost-queen
@@ -302,3 +329,4 @@ iron-knight, arc-strider, necromancer, spellblade-empress, earth-warden, dawn-pr
 - Action targeting is auto-resolved (no manual target selection by client)
 - No interruption system
 - Shield is implemented as a timed status
+- Training bot is passive (does nothing) — active AI not yet implemented

@@ -28,6 +28,11 @@ pub type ClientMessage {
   GetMatchHistory(limit: Int, offset: Int)
   GetLeaderboard(limit: Int)
   GetPlayerStats(target_player_id: String)
+  StartTraining(
+    hero_slug_1: String,
+    hero_slug_2: String,
+    hero_slug_3: String,
+  )
 }
 
 // ============================================================================
