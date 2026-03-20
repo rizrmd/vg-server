@@ -199,7 +199,7 @@ fn get_timestamp() -> Int {
   do_get_timestamp()
 }
 
-@external(erlang, "erlang", "system_time")
+@external(erlang, "vg_server_ffi", "timestamp_ms")
 fn do_get_timestamp() -> Int
 
 // Public API
