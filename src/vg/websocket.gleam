@@ -12,9 +12,10 @@ import vg/db
 import vg/game_json.{
   type ClientMessage, type ServerMessage, Authenticate, AuthError,
   Authenticated, CastAction, Connected, Error as ServerError, GetLeaderboard,
-  GetMatchHistory, GetPlayerStats, Leaderboard, LeaveMatch, MatchFound,
-  MatchHistory, MatchmakingQueued, PlayerStatsResponse, ProfileUpdated,
-  QueueMatchmaking, RerollHand, StartTraining, StateUpdate, UpsertProfile,
+  GetMatchHistory, GetMatchState, GetPlayerStats, Leaderboard, LeaveMatch,
+  MatchFound, MatchHistory, MatchmakingQueued, PlayerStatsResponse,
+  ProfileUpdated, QueueMatchmaking, RerollHand, StartTraining, StateUpdate,
+  UpsertProfile,
 }
 import vg/google_auth
 import vg/json_parse
@@ -349,6 +350,33 @@ fn handle_authenticated_message(
       handle_start_training(state, h1, h2, h3, conn)
     }
 
+    GetMatchState(match_id) -> {
+      case state.current_match_id {
+        Some(current_id) if current_id == match_id -> {
+          case match_registry.get_match(state.match_registry, match_id) {
+            Ok(match_actor) -> {
+              send_match_state(conn, match_actor, state)
+              mist.continue(state)
+            }
+            Error(_) -> {
+              send_server_message(
+                conn,
+                ServerError("MATCH_NOT_FOUND", "Match not found"),
+              )
+              mist.continue(state)
+            }
+          }
+        }
+        _ -> {
+          send_server_message(
+            conn,
+            ServerError("NOT_IN_MATCH", "You are not in this match"),
+          )
+          mist.continue(state)
+        }
+      }
+    }
+
     LeaveMatch(_match_id) -> {
       send_server_message(
         conn,
@@ -473,6 +501,7 @@ fn handle_start_training(
         match.start_match_with_heroes(match_actor, [h1, h2, h3], bot_heroes)
 
       send_server_message(conn, MatchFound(match_id, 1))
+      send_match_state(conn, match_actor, state)
       mist.continue(
         WsState(
           ..state,

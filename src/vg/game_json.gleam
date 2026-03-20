@@ -33,6 +33,7 @@ pub type ClientMessage {
     hero_slug_2: String,
     hero_slug_3: String,
   )
+  GetMatchState(match_id: String)
 }
 
 // ============================================================================

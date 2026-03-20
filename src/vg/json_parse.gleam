@@ -4,8 +4,8 @@ import gleam/result
 import gleam/string
 import vg/game_json.{
   type ClientMessage, Authenticate, CastAction, GetLeaderboard, GetMatchHistory,
-  GetPlayerStats, LeaveMatch, QueueMatchmaking, RerollHand, StartTraining,
-  UpsertProfile,
+  GetMatchState, GetPlayerStats, LeaveMatch, QueueMatchmaking, RerollHand,
+  StartTraining, UpsertProfile,
 }
 
 pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
@@ -81,6 +81,10 @@ pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
       use h2 <- result.try(get_json_string_field(json_str, "hero_slug_2"))
       use h3 <- result.try(get_json_string_field(json_str, "hero_slug_3"))
       Ok(StartTraining(hero_slug_1: h1, hero_slug_2: h2, hero_slug_3: h3))
+    }
+    "get_match_state" -> {
+      use match_id <- result.try(get_json_string_field(json_str, "match_id"))
+      Ok(GetMatchState(match_id: match_id))
     }
     _ -> Error(Nil)
   }
