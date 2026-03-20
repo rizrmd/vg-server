@@ -13,7 +13,7 @@ import vg/game_json.{
   type ClientMessage, type ServerMessage, Authenticate, AuthError,
   Authenticated, CastAction, Connected, Error as ServerError, GetLeaderboard,
   GetMatchHistory, GetMatchState, GetPlayerStats, Leaderboard, LeaveMatch,
-  MatchFound, MatchHistory, MatchmakingQueued, PlayerStatsResponse,
+  MatchFound, MatchHistory, MatchmakingLeft, MatchmakingQueued, PlayerStatsResponse,
   ProfileUpdated, QueueMatchmaking, RerollHand, StartTraining, StateUpdate,
   UpsertProfile,
 }
@@ -378,10 +378,7 @@ fn handle_authenticated_message(
     }
 
     LeaveMatch(_match_id) -> {
-      send_server_message(
-        conn,
-        ServerError("NOT_IMPLEMENTED", "leave_match not yet fully implemented"),
-      )
+      send_server_message(conn, MatchmakingLeft)
       mist.continue(
         WsState(..state, current_match_id: None, current_team: None),
       )
