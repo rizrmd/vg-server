@@ -1,5 +1,6 @@
 // WebSocket handler for game communication
 import gleam/dict
+import gleam/list
 import gleam/erlang/process.{type Subject}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
@@ -561,7 +562,7 @@ fn handle_start_training(
 fn send_match_state(
   conn: mist.WebsocketConnection,
   match_actor: Subject(match.Message),
-  _state: WsState,
+  state: WsState,
 ) -> Nil {
   let match_state = match.get_state(match_actor)
 
@@ -571,6 +572,13 @@ fn send_match_state(
   let casts_list = dict.values(match_state.casts)
   let players_list = dict.values(match_state.players)
 
+  // Only send hand slots belonging to this player's team
+  let team_hand = case state.current_team {
+    Some(team) ->
+      list.filter(match_state.hand_slots, fn(slot) { slot.team == team })
+    None -> []
+  }
+
   send_server_message(
     conn,
     StateUpdate(
@@ -578,7 +586,7 @@ fn send_match_state(
       players: players_list,
       team_states: team_states_list,
       heroes: heroes_list,
-      hand: match_state.hand_slots,
+      hand: team_hand,
       statuses: statuses_list,
       casts: casts_list,
     ),
