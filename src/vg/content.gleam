@@ -6,7 +6,7 @@ import gleam/option.{Some, None}
 import vg/types.{
   type ActionDef, type HeroDef, ActionDef, AllySingle, Damage, DamageAndStatus,
   EnemySingle, Fire, Heal, HeroDef, Ice, Light, Self, Shadow, Shield, Status, Wind,
-  ShieldBuff, AttackBuff, Cleanse, Dot, Hot, Stun, Earth,
+  ShieldBuff, AttackBuff, Dot, Hot, Stun, Earth,
 }
 
 // ============================================================================
@@ -329,589 +329,251 @@ fn frost_queen() -> HeroDef {
 // ============================================================================
 
 pub fn action_definitions() -> Dict(String, ActionDef) {
+  // Slugs must match editor data/action/ directory names (hyphens, not underscores)
   dict.from_list([
-    // Fire actions
+    // Fire
     #("fireball", fireball()),
-    #("inferno", inferno()),
-    #("flame_shield", flame_shield()),
-    #("meteor", meteor()),
-    #("burn", burn()),
-    
-    // Ice actions
-    #("ice_shard", ice_shard()),
-    #("frost_armor", frost_armor()),
+    #("flame-lance", flame_lance()),
+    // Ice
+    #("frostbolt", frostbolt()),
     #("blizzard", blizzard()),
-    #("frost_nova", frost_nova()),
-    #("deep_freeze", deep_freeze()),
-    
-    // Earth actions
-    #("rock_throw", rock_throw()),
-    #("earth_shield", earth_shield()),
-    #("quake", quake()),
-    #("stone_skin", stone_skin()),
-    
-    // Wind actions
-    #("wind_slash", wind_slash()),
-    #("gust", gust()),
-    #("lightning_strike", lightning_strike()),
-    #("tailwind", tailwind()),
-    
-    // Light actions
-    #("heal", heal()),
-    #("smite", smite()),
-    #("divine_shield", divine_shield()),
-    #("mass_heal", mass_heal()),
-    #("bless", bless()),
-    #("judgment", judgment()),
-    
-    // Shadow actions
-    #("shadow_strike", shadow_strike()),
-    #("dark_bolt", dark_bolt()),
-    #("curse", curse()),
-    #("life_drain", life_drain()),
-    #("dark_ritual", dark_ritual()),
-    
-    // Basic actions
-    #("attack", basic_attack()),
-    #("defend", defend()),
-    #("cleanse", cleanse_action()),
-    #("focus", focus()),
+    #("ice-nova", ice_nova()),
+    // Earth
+    #("fortify", fortify()),
+    #("shield-wall", shield_wall()),
+    #("stand-firm", stand_firm()),
+    #("poison-strike", poison_strike()),
+    #("toxic-coating", toxic_coating()),
+    // Wind
+    #("chain-spark", chain_spark()),
+    #("smoke-bomb", smoke_bomb()),
+    #("time-slip", time_slip()),
+    // Light
+    #("arcane-blast", arcane_blast()),
+    #("holy", holy()),
+    #("mana-weave", mana_weave()),
+    #("mirror-shield", mirror_shield()),
+    #("rally-cry", rally_cry()),
+    // Shadow
+    #("cursed-dart", curse_dart()),
+    #("leech-blade", leech_blade()),
+    #("shadowstep", shadowstep()),
+    #("garrote", garrote()),
+    // Physical / neutral
+    #("shiv", shiv()),
+    #("charge", charge()),
+    #("cleave", cleave()),
+    #("execute", execute()),
+    #("riposte", riposte()),
+    #("intercept", intercept()),
+    #("taunt", taunt()),
+    #("mark-target", mark_target()),
+    #("chain", chain()),
   ])
 }
 
-// Fire actions
+// ---------------------------------------------------------------------------
+// Action definitions — slugs match editor data/action/ directory names
+// ---------------------------------------------------------------------------
+
+// -- Fire --
 fn fireball() -> ActionDef {
-  ActionDef(
-    slug: "fireball",
-    display_name: "Fireball",
-    element: Fire,
-    target_rule: EnemySingle,
-    energy_cost: 3,
-    casting_time_ms: 1500,
-    effect_kind: Damage,
-    base_power: 25,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+  ActionDef(slug: "fireball", display_name: "Fireball", element: Fire,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1500,
+    effect_kind: Damage, base_power: 25,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn flame_lance() -> ActionDef {
+  ActionDef(slug: "flame-lance", display_name: "Flame Lance", element: Fire,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: DamageAndStatus, base_power: 20,
+    status_kind: Some(Dot), status_duration_ms: 4000, status_value: 6)
 }
 
-fn inferno() -> ActionDef {
-  ActionDef(
-    slug: "inferno",
-    display_name: "Inferno",
-    element: Fire,
-    target_rule: EnemySingle,
-    energy_cost: 5,
-    casting_time_ms: 2500,
-    effect_kind: DamageAndStatus,
-    base_power: 35,
-    status_kind: Some(Dot),
-    status_duration_ms: 5000,
-    status_value: 8,
-  )
+// -- Ice --
+fn frostbolt() -> ActionDef {
+  ActionDef(slug: "frostbolt", display_name: "Frostbolt", element: Ice,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
+    effect_kind: Damage, base_power: 15,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-
-fn flame_shield() -> ActionDef {
-  ActionDef(
-    slug: "flame_shield",
-    display_name: "Flame Shield",
-    element: Fire,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1000,
-    effect_kind: Shield,
-    base_power: 20,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn meteor() -> ActionDef {
-  ActionDef(
-    slug: "meteor",
-    display_name: "Meteor",
-    element: Fire,
-    target_rule: EnemySingle,
-    energy_cost: 7,
-    casting_time_ms: 3500,
-    effect_kind: DamageAndStatus,
-    base_power: 50,
-    status_kind: Some(Dot),
-    status_duration_ms: 4000,
-    status_value: 12,
-  )
-}
-
-fn burn() -> ActionDef {
-  ActionDef(
-    slug: "burn",
-    display_name: "Burn",
-    element: Fire,
-    target_rule: EnemySingle,
-    energy_cost: 2,
-    casting_time_ms: 800,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(Dot),
-    status_duration_ms: 6000,
-    status_value: 6,
-  )
-}
-
-// Ice actions
-fn ice_shard() -> ActionDef {
-  ActionDef(
-    slug: "ice_shard",
-    display_name: "Ice Shard",
-    element: Ice,
-    target_rule: EnemySingle,
-    energy_cost: 2,
-    casting_time_ms: 1000,
-    effect_kind: Damage,
-    base_power: 15,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn frost_armor() -> ActionDef {
-  ActionDef(
-    slug: "frost_armor",
-    display_name: "Frost Armor",
-    element: Ice,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1200,
-    effect_kind: Shield,
-    base_power: 25,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
 fn blizzard() -> ActionDef {
-  ActionDef(
-    slug: "blizzard",
-    display_name: "Blizzard",
-    element: Ice,
-    target_rule: EnemySingle,
-    energy_cost: 6,
-    casting_time_ms: 3000,
-    effect_kind: DamageAndStatus,
-    base_power: 30,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 4000,
-    status_value: -10,
-  )
+  ActionDef(slug: "blizzard", display_name: "Blizzard", element: Ice,
+    target_rule: EnemySingle, energy_cost: 4, casting_time_ms: 2500,
+    effect_kind: DamageAndStatus, base_power: 28,
+    status_kind: Some(AttackBuff), status_duration_ms: 4000, status_value: -10)
+}
+fn ice_nova() -> ActionDef {
+  ActionDef(slug: "ice-nova", display_name: "Ice Nova", element: Ice,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1800,
+    effect_kind: DamageAndStatus, base_power: 18,
+    status_kind: Some(AttackBuff), status_duration_ms: 3000, status_value: -12)
 }
 
-fn frost_nova() -> ActionDef {
-  ActionDef(
-    slug: "frost_nova",
-    display_name: "Frost Nova",
-    element: Ice,
-    target_rule: EnemySingle,
-    energy_cost: 4,
-    casting_time_ms: 1800,
-    effect_kind: DamageAndStatus,
-    base_power: 20,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 3000,
-    status_value: -15,
-  )
+// -- Earth --
+fn fortify() -> ActionDef {
+  ActionDef(slug: "fortify", display_name: "Fortify", element: Earth,
+    target_rule: AllySingle, energy_cost: 3, casting_time_ms: 1000,
+    effect_kind: Shield, base_power: 30,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn shield_wall() -> ActionDef {
+  ActionDef(slug: "shield-wall", display_name: "Shield Wall", element: Earth,
+    target_rule: AllySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 6000, status_value: 20)
+}
+fn stand_firm() -> ActionDef {
+  ActionDef(slug: "stand-firm", display_name: "Stand Firm", element: Earth,
+    target_rule: Self, energy_cost: 2, casting_time_ms: 800,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: 15)
+}
+fn poison_strike() -> ActionDef {
+  ActionDef(slug: "poison-strike", display_name: "Poison Strike", element: Earth,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1400,
+    effect_kind: DamageAndStatus, base_power: 16,
+    status_kind: Some(Dot), status_duration_ms: 5000, status_value: 7)
+}
+fn toxic_coating() -> ActionDef {
+  ActionDef(slug: "toxic-coating", display_name: "Toxic Coating", element: Earth,
+    target_rule: AllySingle, energy_cost: 2, casting_time_ms: 800,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 10)
 }
 
-fn deep_freeze() -> ActionDef {
-  ActionDef(
-    slug: "deep_freeze",
-    display_name: "Deep Freeze",
-    element: Ice,
-    target_rule: EnemySingle,
-    energy_cost: 5,
-    casting_time_ms: 2200,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(Stun),
-    status_duration_ms: 2000,
-    status_value: 0,
-  )
+// -- Wind --
+fn chain_spark() -> ActionDef {
+  ActionDef(slug: "chain-spark", display_name: "Chain Spark", element: Wind,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: Damage, base_power: 22,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn smoke_bomb() -> ActionDef {
+  ActionDef(slug: "smoke-bomb", display_name: "Smoke Bomb", element: Wind,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1000,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 4000, status_value: -15)
+}
+fn time_slip() -> ActionDef {
+  ActionDef(slug: "time-slip", display_name: "Time Slip", element: Wind,
+    target_rule: AllySingle, energy_cost: 4, casting_time_ms: 1400,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 18)
 }
 
-// Earth actions
-fn rock_throw() -> ActionDef {
-  ActionDef(
-    slug: "rock_throw",
-    display_name: "Rock Throw",
-    element: Earth,
-    target_rule: EnemySingle,
-    energy_cost: 2,
-    casting_time_ms: 1200,
-    effect_kind: Damage,
-    base_power: 18,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+// -- Light --
+fn arcane_blast() -> ActionDef {
+  ActionDef(slug: "arcane-blast", display_name: "Arcane Blast", element: Light,
+    target_rule: EnemySingle, energy_cost: 4, casting_time_ms: 1800,
+    effect_kind: Damage, base_power: 32,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn holy() -> ActionDef {
+  ActionDef(slug: "holy", display_name: "Holy", element: Light,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1500,
+    effect_kind: Damage, base_power: 24,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn mana_weave() -> ActionDef {
+  ActionDef(slug: "mana-weave", display_name: "Mana Weave", element: Light,
+    target_rule: AllySingle, energy_cost: 2, casting_time_ms: 1000,
+    effect_kind: Heal, base_power: 20,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn mirror_shield() -> ActionDef {
+  ActionDef(slug: "mirror-shield", display_name: "Mirror Shield", element: Light,
+    target_rule: AllySingle, energy_cost: 4, casting_time_ms: 1200,
+    effect_kind: Shield, base_power: 45,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn rally_cry() -> ActionDef {
+  ActionDef(slug: "rally-cry", display_name: "Rally Cry", element: Light,
+    target_rule: AllySingle, energy_cost: 3, casting_time_ms: 1000,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 14)
 }
 
-fn earth_shield() -> ActionDef {
-  ActionDef(
-    slug: "earth_shield",
-    display_name: "Earth Shield",
-    element: Earth,
-    target_rule: AllySingle,
-    energy_cost: 4,
-    casting_time_ms: 1500,
-    effect_kind: Shield,
-    base_power: 40,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+// -- Shadow --
+fn curse_dart() -> ActionDef {
+  ActionDef(slug: "cursed-dart", display_name: "Cursed Dart", element: Shadow,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 900,
+    effect_kind: DamageAndStatus, base_power: 12,
+    status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: -10)
+}
+fn leech_blade() -> ActionDef {
+  ActionDef(slug: "leech-blade", display_name: "Leech Blade", element: Shadow,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1400,
+    effect_kind: DamageAndStatus, base_power: 20,
+    status_kind: Some(Hot), status_duration_ms: 4000, status_value: 8)
+}
+fn shadowstep() -> ActionDef {
+  ActionDef(slug: "shadowstep", display_name: "Shadowstep", element: Shadow,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 800,
+    effect_kind: Damage, base_power: 26,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn garrote() -> ActionDef {
+  ActionDef(slug: "garrote", display_name: "Garrote", element: Shadow,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: DamageAndStatus, base_power: 14,
+    status_kind: Some(Dot), status_duration_ms: 6000, status_value: 8)
 }
 
-fn quake() -> ActionDef {
-  ActionDef(
-    slug: "quake",
-    display_name: "Quake",
-    element: Earth,
-    target_rule: EnemySingle,
-    energy_cost: 5,
-    casting_time_ms: 2500,
-    effect_kind: DamageAndStatus,
-    base_power: 28,
-    status_kind: Some(ShieldBuff),
-    status_duration_ms: 4000,
-    status_value: -12,
-  )
+// -- Physical / Neutral --
+fn shiv() -> ActionDef {
+  ActionDef(slug: "shiv", display_name: "Shiv", element: Earth,
+    target_rule: EnemySingle, energy_cost: 1, casting_time_ms: 600,
+    effect_kind: Damage, base_power: 10,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-
-fn stone_skin() -> ActionDef {
-  ActionDef(
-    slug: "stone_skin",
-    display_name: "Stone Skin",
-    element: Earth,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1200,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(ShieldBuff),
-    status_duration_ms: 8000,
-    status_value: 20,
-  )
+fn charge() -> ActionDef {
+  ActionDef(slug: "charge", display_name: "Charge", element: Earth,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1000,
+    effect_kind: DamageAndStatus, base_power: 22,
+    status_kind: Some(Stun), status_duration_ms: 1500, status_value: 0)
 }
-
-// Wind actions
-fn wind_slash() -> ActionDef {
-  ActionDef(
-    slug: "wind_slash",
-    display_name: "Wind Slash",
-    element: Wind,
-    target_rule: EnemySingle,
-    energy_cost: 2,
-    casting_time_ms: 800,
-    effect_kind: Damage,
-    base_power: 14,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+fn cleave() -> ActionDef {
+  ActionDef(slug: "cleave", display_name: "Cleave", element: Earth,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: Damage, base_power: 24,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-
-fn gust() -> ActionDef {
-  ActionDef(
-    slug: "gust",
-    display_name: "Gust",
-    element: Wind,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1000,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 5000,
-    status_value: 12,
-  )
+fn execute() -> ActionDef {
+  ActionDef(slug: "execute", display_name: "Execute", element: Earth,
+    target_rule: EnemySingle, energy_cost: 4, casting_time_ms: 2000,
+    effect_kind: Damage, base_power: 40,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-
-fn lightning_strike() -> ActionDef {
-  ActionDef(
-    slug: "lightning_strike",
-    display_name: "Lightning Strike",
-    element: Wind,
-    target_rule: EnemySingle,
-    energy_cost: 4,
-    casting_time_ms: 1400,
-    effect_kind: Damage,
-    base_power: 30,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+fn riposte() -> ActionDef {
+  ActionDef(slug: "riposte", display_name: "Riposte", element: Earth,
+    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 3000, status_value: 12)
 }
-
-fn tailwind() -> ActionDef {
-  ActionDef(
-    slug: "tailwind",
-    display_name: "Tailwind",
-    element: Wind,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1000,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 6000,
-    status_value: 15,
-  )
+fn intercept() -> ActionDef {
+  ActionDef(slug: "intercept", display_name: "Intercept", element: Earth,
+    target_rule: AllySingle, energy_cost: 3, casting_time_ms: 800,
+    effect_kind: Shield, base_power: 25,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-
-// Light actions
-fn heal() -> ActionDef {
-  ActionDef(
-    slug: "heal",
-    display_name: "Heal",
-    element: Light,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1500,
-    effect_kind: Heal,
-    base_power: 35,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+fn taunt() -> ActionDef {
+  ActionDef(slug: "taunt", display_name: "Taunt", element: Earth,
+    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: 18)
 }
-
-fn smite() -> ActionDef {
-  ActionDef(
-    slug: "smite",
-    display_name: "Smite",
-    element: Light,
-    target_rule: EnemySingle,
-    energy_cost: 3,
-    casting_time_ms: 1500,
-    effect_kind: Damage,
-    base_power: 22,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
+fn mark_target() -> ActionDef {
+  ActionDef(slug: "mark-target", display_name: "Mark Target", element: Earth,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 800,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 5000, status_value: -12)
 }
-
-fn divine_shield() -> ActionDef {
-  ActionDef(
-    slug: "divine_shield",
-    display_name: "Divine Shield",
-    element: Light,
-    target_rule: AllySingle,
-    energy_cost: 4,
-    casting_time_ms: 1200,
-    effect_kind: Shield,
-    base_power: 50,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn mass_heal() -> ActionDef {
-  ActionDef(
-    slug: "mass_heal",
-    display_name: "Mass Heal",
-    element: Light,
-    target_rule: Self,
-    energy_cost: 6,
-    casting_time_ms: 3000,
-    effect_kind: Heal,
-    base_power: 55,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn bless() -> ActionDef {
-  ActionDef(
-    slug: "bless",
-    display_name: "Bless",
-    element: Light,
-    target_rule: AllySingle,
-    energy_cost: 4,
-    casting_time_ms: 1400,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 6000,
-    status_value: 15,
-  )
-}
-
-fn judgment() -> ActionDef {
-  ActionDef(
-    slug: "judgment",
-    display_name: "Judgment",
-    element: Light,
-    target_rule: EnemySingle,
-    energy_cost: 6,
-    casting_time_ms: 2800,
-    effect_kind: Damage,
-    base_power: 45,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-// Shadow actions
-fn shadow_strike() -> ActionDef {
-  ActionDef(
-    slug: "shadow_strike",
-    display_name: "Shadow Strike",
-    element: Shadow,
-    target_rule: EnemySingle,
-    energy_cost: 3,
-    casting_time_ms: 1200,
-    effect_kind: Damage,
-    base_power: 28,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn dark_bolt() -> ActionDef {
-  ActionDef(
-    slug: "dark_bolt",
-    display_name: "Dark Bolt",
-    element: Shadow,
-    target_rule: EnemySingle,
-    energy_cost: 4,
-    casting_time_ms: 1800,
-    effect_kind: DamageAndStatus,
-    base_power: 24,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 5000,
-    status_value: -8,
-  )
-}
-
-fn curse() -> ActionDef {
-  ActionDef(
-    slug: "curse",
-    display_name: "Curse",
-    element: Shadow,
-    target_rule: EnemySingle,
-    energy_cost: 5,
-    casting_time_ms: 2000,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(ShieldBuff),
-    status_duration_ms: 6000,
-    status_value: -15,
-  )
-}
-
-fn life_drain() -> ActionDef {
-  ActionDef(
-    slug: "life_drain",
-    display_name: "Life Drain",
-    element: Shadow,
-    target_rule: EnemySingle,
-    energy_cost: 4,
-    casting_time_ms: 1600,
-    effect_kind: DamageAndStatus,
-    base_power: 20,
-    status_kind: Some(Hot),
-    status_duration_ms: 4000,
-    status_value: 8,
-  )
-}
-
-fn dark_ritual() -> ActionDef {
-  ActionDef(
-    slug: "dark_ritual",
-    display_name: "Dark Ritual",
-    element: Shadow,
-    target_rule: Self,
-    energy_cost: 5,
-    casting_time_ms: 2400,
-    effect_kind: Heal,
-    base_power: 40,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-// Basic actions
-fn basic_attack() -> ActionDef {
-  ActionDef(
-    slug: "attack",
-    display_name: "Attack",
-    element: Earth,
-    target_rule: EnemySingle,
-    energy_cost: 0,
-    casting_time_ms: 1000,
-    effect_kind: Damage,
-    base_power: 10,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn defend() -> ActionDef {
-  ActionDef(
-    slug: "defend",
-    display_name: "Defend",
-    element: Earth,
-    target_rule: Self,
-    energy_cost: 1,
-    casting_time_ms: 500,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(ShieldBuff),
-    status_duration_ms: 3000,
-    status_value: 15,
-  )
-}
-
-fn cleanse_action() -> ActionDef {
-  ActionDef(
-    slug: "cleanse",
-    display_name: "Cleanse",
-    element: Light,
-    target_rule: AllySingle,
-    energy_cost: 3,
-    casting_time_ms: 1000,
-    effect_kind: Cleanse,
-    base_power: 0,
-    status_kind: None,
-    status_duration_ms: 0,
-    status_value: 0,
-  )
-}
-
-fn focus() -> ActionDef {
-  ActionDef(
-    slug: "focus",
-    display_name: "Focus",
-    element: Light,
-    target_rule: Self,
-    energy_cost: 2,
-    casting_time_ms: 800,
-    effect_kind: Status,
-    base_power: 0,
-    status_kind: Some(AttackBuff),
-    status_duration_ms: 4000,
-    status_value: 10,
-  )
+fn chain() -> ActionDef {
+  ActionDef(slug: "chain", display_name: "Chain", element: Earth,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
+    effect_kind: DamageAndStatus, base_power: 14,
+    status_kind: Some(AttackBuff), status_duration_ms: 3000, status_value: -8)
 }
 
 // ============================================================================
