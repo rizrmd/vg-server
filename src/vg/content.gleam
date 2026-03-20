@@ -1,58 +1,39 @@
 // Static content definitions - heroes and actions
-// Based on triarc-slice repository data
+// Auto-generated from triarc-slice data/ — do not edit by hand.
+// Regenerate with: node scripts/sync-content.mjs
 
 import gleam/dict.{type Dict}
 import gleam/option.{Some, None}
 import vg/types.{
-  type ActionDef, type HeroDef, ActionDef, AllySingle, Damage, DamageAndStatus,
-  EnemySingle, Fire, Heal, HeroDef, Ice, Light, Self, Shadow, Shield, Status, Wind,
-  ShieldBuff, AttackBuff, Dot, Hot, Stun, Earth,
+  type ActionDef, type HeroDef, ActionDef, HeroDef, AllySingle, EnemySingle, Self, Earth, Fire, Ice, Light, Shadow, Wind, Damage, DamageAndStatus, Heal, Shield, Status, AttackBuff, Dot, Hot, ShieldBuff, Stun,
 }
 
 // ============================================================================
-// Hero definitions from triarc-slice
+// Hero definitions
 // ============================================================================
 
 pub fn hero_definitions() -> Dict(String, HeroDef) {
   dict.from_list([
-    #("iron-knight", iron_knight()),
     #("arc-strider", arc_strider()),
-    #("necromancer", necromancer()),
-    #("spellblade-empress", spellblade_empress()),
-    #("earth-warden", earth_warden()),
-    #("dawn-priest", dawn_priest()),
-    #("flame-warlock", flame_warlock()),
+    #("arcane-paladin", arcane_paladin()),
     #("blood-alchemist", blood_alchemist()),
+    #("dawn-priest", dawn_priest()),
+    #("demon-empress", demon_empress()),
+    #("earth-warden", earth_warden()),
+    #("flame-warlock", flame_warlock()),
+    #("frost-queen", frost_queen()),
     #("gunslinger", gunslinger()),
+    #("iron-knight", iron_knight()),
+    #("necromancer", necromancer()),
     #("night-venom", night_venom()),
     #("princess-emberheart", princess_emberheart()),
-    #("demon-empress", demon_empress()),
-    #("tyrant-overlord", tyrant_overlord()),
-    #("arcane-paladin", arcane_paladin()),
+    #("spellblade-empress", spellblade_empress()),
     #("storm-ranger", storm_ranger()),
+    #("tyrant-overlord", tyrant_overlord()),
     #("wind-monk", wind_monk()),
-    #("frost-queen", frost_queen()),
   ])
 }
 
-// Iron Knight - Tanky warrior with high defense
-fn iron_knight() -> HeroDef {
-  HeroDef(
-    slug: "iron-knight",
-    display_name: "Iron Knight",
-    max_hp: 3500,
-    attack: 130,
-    defense: 180,
-    fire_affinity: -15,
-    ice_affinity: 10,
-    earth_affinity: 30,
-    wind_affinity: -20,
-    light_affinity: 10,
-    shadow_affinity: 0,
-  )
-}
-
-// Arc Strider - Fast lightning warrior
 fn arc_strider() -> HeroDef {
   HeroDef(
     slug: "arc-strider",
@@ -69,58 +50,38 @@ fn arc_strider() -> HeroDef {
   )
 }
 
-// Necromancer - Shadow magic user
-fn necromancer() -> HeroDef {
+fn arcane_paladin() -> HeroDef {
   HeroDef(
-    slug: "necromancer",
-    display_name: "Necromancer",
-    max_hp: 2300,
-    attack: 160,
-    defense: 100,
+    slug: "arcane-paladin",
+    display_name: "Arcane Paladin",
+    max_hp: 3200,
+    attack: 145,
+    defense: 145,
     fire_affinity: -20,
-    ice_affinity: 15,
+    ice_affinity: 0,
+    earth_affinity: 10,
+    wind_affinity: -10,
+    light_affinity: 20,
+    shadow_affinity: 15,
+  )
+}
+
+fn blood_alchemist() -> HeroDef {
+  HeroDef(
+    slug: "blood-alchemist",
+    display_name: "Blood Alchemist",
+    max_hp: 2900,
+    attack: 145,
+    defense: 110,
+    fire_affinity: -10,
+    ice_affinity: 0,
     earth_affinity: 10,
     wind_affinity: 0,
-    light_affinity: -30,
-    shadow_affinity: 35,
+    light_affinity: -20,
+    shadow_affinity: 30,
   )
 }
 
-// Spellblade Empress - Balanced elemental fighter
-fn spellblade_empress() -> HeroDef {
-  HeroDef(
-    slug: "spellblade-empress",
-    display_name: "Spellblade Empress",
-    max_hp: 3000,
-    attack: 145,
-    defense: 135,
-    fire_affinity: 5,
-    ice_affinity: 5,
-    earth_affinity: -10,
-    wind_affinity: 5,
-    light_affinity: 20,
-    shadow_affinity: -15,
-  )
-}
-
-// Earth Warden - Defensive nature guardian
-fn earth_warden() -> HeroDef {
-  HeroDef(
-    slug: "earth-warden",
-    display_name: "Earth Warden",
-    max_hp: 3600,
-    attack: 120,
-    defense: 170,
-    fire_affinity: 10,
-    ice_affinity: 10,
-    earth_affinity: 35,
-    wind_affinity: -35,
-    light_affinity: 0,
-    shadow_affinity: -5,
-  )
-}
-
-// Dawn Priest - Healer with light magic
 fn dawn_priest() -> HeroDef {
   HeroDef(
     slug: "dawn-priest",
@@ -137,7 +98,38 @@ fn dawn_priest() -> HeroDef {
   )
 }
 
-// Flame Warlock - Fire damage dealer
+fn demon_empress() -> HeroDef {
+  HeroDef(
+    slug: "demon-empress",
+    display_name: "Demon Empress",
+    max_hp: 3100,
+    attack: 160,
+    defense: 125,
+    fire_affinity: 20,
+    ice_affinity: 0,
+    earth_affinity: 10,
+    wind_affinity: -10,
+    light_affinity: -35,
+    shadow_affinity: 30,
+  )
+}
+
+fn earth_warden() -> HeroDef {
+  HeroDef(
+    slug: "earth-warden",
+    display_name: "Earth Warden",
+    max_hp: 3600,
+    attack: 120,
+    defense: 170,
+    fire_affinity: 10,
+    ice_affinity: 10,
+    earth_affinity: 35,
+    wind_affinity: -35,
+    light_affinity: 0,
+    shadow_affinity: -5,
+  )
+}
+
 fn flame_warlock() -> HeroDef {
   HeroDef(
     slug: "flame-warlock",
@@ -154,173 +146,163 @@ fn flame_warlock() -> HeroDef {
   )
 }
 
-// Blood Alchemist - Dark healer/damage hybrid
-fn blood_alchemist() -> HeroDef {
+fn frost_queen() -> HeroDef {
   HeroDef(
-    slug: "blood-alchemist",
-    display_name: "Blood Alchemist",
-    max_hp: 2600,
-    attack: 140,
-    defense: 110,
-    fire_affinity: 0,
-    ice_affinity: 5,
-    earth_affinity: 0,
-    wind_affinity: -10,
-    light_affinity: -20,
-    shadow_affinity: 25,
+    slug: "frost-queen",
+    display_name: "Frost Queen",
+    max_hp: 2800,
+    attack: 155,
+    defense: 125,
+    fire_affinity: -35,
+    ice_affinity: 40,
+    earth_affinity: -10,
+    wind_affinity: 15,
+    light_affinity: 0,
+    shadow_affinity: 0,
   )
 }
 
-// Gunslinger - Ranged physical damage
 fn gunslinger() -> HeroDef {
   HeroDef(
     slug: "gunslinger",
     display_name: "Gunslinger",
     max_hp: 2500,
     attack: 165,
-    defense: 95,
+    defense: 105,
     fire_affinity: 20,
-    ice_affinity: 0,
+    ice_affinity: -10,
     earth_affinity: -15,
     wind_affinity: 15,
-    light_affinity: 0,
-    shadow_affinity: 5,
+    light_affinity: 10,
+    shadow_affinity: -5,
   )
 }
 
-// Night Venom - Poison/assassin type
+fn iron_knight() -> HeroDef {
+  HeroDef(
+    slug: "iron-knight",
+    display_name: "Iron Knight",
+    max_hp: 3500,
+    attack: 130,
+    defense: 180,
+    fire_affinity: -15,
+    ice_affinity: 10,
+    earth_affinity: 30,
+    wind_affinity: -20,
+    light_affinity: 10,
+    shadow_affinity: 0,
+  )
+}
+
+fn necromancer() -> HeroDef {
+  HeroDef(
+    slug: "necromancer",
+    display_name: "Necromancer",
+    max_hp: 2300,
+    attack: 160,
+    defense: 100,
+    fire_affinity: -20,
+    ice_affinity: 15,
+    earth_affinity: 10,
+    wind_affinity: 0,
+    light_affinity: -30,
+    shadow_affinity: 35,
+  )
+}
+
 fn night_venom() -> HeroDef {
   HeroDef(
     slug: "night-venom",
     display_name: "Night Venom",
-    max_hp: 2400,
+    max_hp: 2500,
     attack: 170,
-    defense: 85,
+    defense: 95,
     fire_affinity: -10,
-    ice_affinity: 10,
-    earth_affinity: 5,
-    wind_affinity: 10,
+    ice_affinity: 0,
+    earth_affinity: 20,
+    wind_affinity: 0,
     light_affinity: -25,
-    shadow_affinity: 30,
+    shadow_affinity: 25,
   )
 }
 
-// Princess Emberheart - Fire/Light hybrid
 fn princess_emberheart() -> HeroDef {
   HeroDef(
     slug: "princess-emberheart",
     display_name: "Princess Emberheart",
     max_hp: 2900,
-    attack: 135,
+    attack: 150,
     defense: 120,
     fire_affinity: 30,
-    ice_affinity: -15,
-    earth_affinity: 0,
+    ice_affinity: -25,
+    earth_affinity: -5,
     wind_affinity: 5,
-    light_affinity: 15,
-    shadow_affinity: -10,
+    light_affinity: 10,
+    shadow_affinity: 0,
   )
 }
 
-// Demon Empress - Shadow/Fire powerhouse
-fn demon_empress() -> HeroDef {
+fn spellblade_empress() -> HeroDef {
   HeroDef(
-    slug: "demon-empress",
-    display_name: "Demon Empress",
-    max_hp: 3200,
-    attack: 150,
-    defense: 140,
-    fire_affinity: 25,
-    ice_affinity: -10,
-    earth_affinity: 10,
-    wind_affinity: -5,
-    light_affinity: -30,
-    shadow_affinity: 30,
+    slug: "spellblade-empress",
+    display_name: "Spellblade Empress",
+    max_hp: 3000,
+    attack: 145,
+    defense: 135,
+    fire_affinity: 5,
+    ice_affinity: 5,
+    earth_affinity: -10,
+    wind_affinity: 5,
+    light_affinity: 20,
+    shadow_affinity: -15,
   )
 }
 
-// Tyrant Overlord - Physical tank with shadow
-fn tyrant_overlord() -> HeroDef {
-  HeroDef(
-    slug: "tyrant-overlord",
-    display_name: "Tyrant Overlord",
-    max_hp: 3800,
-    attack: 125,
-    defense: 185,
-    fire_affinity: 10,
-    ice_affinity: 0,
-    earth_affinity: 20,
-    wind_affinity: -20,
-    light_affinity: -15,
-    shadow_affinity: 20,
-  )
-}
-
-// Arcane Paladin - Light/Ice defender
-fn arcane_paladin() -> HeroDef {
-  HeroDef(
-    slug: "arcane-paladin",
-    display_name: "Arcane Paladin",
-    max_hp: 3300,
-    attack: 115,
-    defense: 165,
-    fire_affinity: 0,
-    ice_affinity: 15,
-    earth_affinity: 5,
-    wind_affinity: -10,
-    light_affinity: 30,
-    shadow_affinity: -20,
-  )
-}
-
-// Storm Ranger - Wind/Lightning archer
 fn storm_ranger() -> HeroDef {
   HeroDef(
     slug: "storm-ranger",
     display_name: "Storm Ranger",
     max_hp: 2600,
     attack: 160,
-    defense: 100,
-    fire_affinity: 5,
-    ice_affinity: 10,
-    earth_affinity: -20,
-    wind_affinity: 30,
-    light_affinity: 10,
+    defense: 110,
+    fire_affinity: -5,
+    ice_affinity: 5,
+    earth_affinity: -25,
+    wind_affinity: 25,
+    light_affinity: 15,
     shadow_affinity: 0,
   )
 }
 
-// Wind Monk - Fast martial artist
+fn tyrant_overlord() -> HeroDef {
+  HeroDef(
+    slug: "tyrant-overlord",
+    display_name: "Tyrant Overlord",
+    max_hp: 3800,
+    attack: 165,
+    defense: 150,
+    fire_affinity: 20,
+    ice_affinity: 0,
+    earth_affinity: 15,
+    wind_affinity: -10,
+    light_affinity: -35,
+    shadow_affinity: 25,
+  )
+}
+
 fn wind_monk() -> HeroDef {
   HeroDef(
     slug: "wind-monk",
     display_name: "Wind Monk",
-    max_hp: 2800,
-    attack: 155,
-    defense: 105,
-    fire_affinity: 0,
-    ice_affinity: -5,
-    earth_affinity: -15,
-    wind_affinity: 35,
-    light_affinity: 5,
-    shadow_affinity: -5,
-  )
-}
-
-// Frost Queen - Ice control mage
-fn frost_queen() -> HeroDef {
-  HeroDef(
-    slug: "frost-queen",
-    display_name: "Frost Queen",
     max_hp: 2700,
-    attack: 150,
-    defense: 115,
-    fire_affinity: -30,
-    ice_affinity: 40,
-    earth_affinity: 5,
-    wind_affinity: 10,
-    light_affinity: 0,
-    shadow_affinity: 5,
+    attack: 140,
+    defense: 120,
+    fire_affinity: 0,
+    ice_affinity: 0,
+    earth_affinity: -25,
+    wind_affinity: 35,
+    light_affinity: 10,
+    shadow_affinity: -5,
   )
 }
 
@@ -331,44 +313,37 @@ fn frost_queen() -> HeroDef {
 pub fn action_definitions() -> Dict(String, ActionDef) {
   // Slugs must match editor data/action/ directory names (hyphens, not underscores)
   dict.from_list([
-    // Fire
-    #("fireball", fireball()),
-    #("flame-lance", flame_lance()),
-    // Ice
-    #("frostbolt", frostbolt()),
-    #("blizzard", blizzard()),
-    #("ice-nova", ice_nova()),
-    // Earth
-    #("fortify", fortify()),
-    #("shield-wall", shield_wall()),
-    #("stand-firm", stand_firm()),
-    #("poison-strike", poison_strike()),
-    #("toxic-coating", toxic_coating()),
-    // Wind
-    #("chain-spark", chain_spark()),
-    #("smoke-bomb", smoke_bomb()),
-    #("time-slip", time_slip()),
-    // Light
     #("arcane-blast", arcane_blast()),
-    #("holy", holy()),
-    #("mana-weave", mana_weave()),
-    #("mirror-shield", mirror_shield()),
-    #("rally-cry", rally_cry()),
-    // Shadow
-    #("cursed-dart", curse_dart()),
-    #("leech-blade", leech_blade()),
-    #("shadowstep", shadowstep()),
-    #("garrote", garrote()),
-    // Physical / neutral
-    #("shiv", shiv()),
+    #("blizzard", blizzard()),
+    #("chain", chain()),
+    #("chain-spark", chain_spark()),
     #("charge", charge()),
     #("cleave", cleave()),
+    #("cursed-dart", cursed_dart()),
     #("execute", execute()),
-    #("riposte", riposte()),
+    #("fireball", fireball()),
+    #("flame-lance", flame_lance()),
+    #("fortify", fortify()),
+    #("frostbolt", frostbolt()),
+    #("garrote", garrote()),
+    #("holy", holy()),
+    #("ice-nova", ice_nova()),
     #("intercept", intercept()),
-    #("taunt", taunt()),
+    #("leech-blade", leech_blade()),
+    #("mana-weave", mana_weave()),
     #("mark-target", mark_target()),
-    #("chain", chain()),
+    #("mirror-shield", mirror_shield()),
+    #("poison-strike", poison_strike()),
+    #("rally-cry", rally_cry()),
+    #("riposte", riposte()),
+    #("shadowstep", shadowstep()),
+    #("shield-wall", shield_wall()),
+    #("shiv", shiv()),
+    #("smoke-bomb", smoke_bomb()),
+    #("stand-firm", stand_firm()),
+    #("taunt", taunt()),
+    #("time-slip", time_slip()),
+    #("toxic-coating", toxic_coating()),
   ])
 }
 
@@ -391,17 +366,17 @@ fn flame_lance() -> ActionDef {
 }
 
 // -- Ice --
-fn frostbolt() -> ActionDef {
-  ActionDef(slug: "frostbolt", display_name: "Frostbolt", element: Ice,
-    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
-    effect_kind: Damage, base_power: 15,
-    status_kind: None, status_duration_ms: 0, status_value: 0)
-}
 fn blizzard() -> ActionDef {
   ActionDef(slug: "blizzard", display_name: "Blizzard", element: Ice,
     target_rule: EnemySingle, energy_cost: 4, casting_time_ms: 2500,
     effect_kind: DamageAndStatus, base_power: 28,
     status_kind: Some(AttackBuff), status_duration_ms: 4000, status_value: -10)
+}
+fn frostbolt() -> ActionDef {
+  ActionDef(slug: "frostbolt", display_name: "Frostbolt", element: Ice,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
+    effect_kind: Damage, base_power: 15,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
 }
 fn ice_nova() -> ActionDef {
   ActionDef(slug: "ice-nova", display_name: "Ice Nova", element: Ice,
@@ -417,6 +392,12 @@ fn fortify() -> ActionDef {
     effect_kind: Shield, base_power: 30,
     status_kind: None, status_duration_ms: 0, status_value: 0)
 }
+fn poison_strike() -> ActionDef {
+  ActionDef(slug: "poison-strike", display_name: "Poison Strike", element: Earth,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1400,
+    effect_kind: DamageAndStatus, base_power: 16,
+    status_kind: Some(Dot), status_duration_ms: 5000, status_value: 7)
+}
 fn shield_wall() -> ActionDef {
   ActionDef(slug: "shield-wall", display_name: "Shield Wall", element: Earth,
     target_rule: AllySingle, energy_cost: 3, casting_time_ms: 1200,
@@ -428,12 +409,6 @@ fn stand_firm() -> ActionDef {
     target_rule: Self, energy_cost: 2, casting_time_ms: 800,
     effect_kind: Status, base_power: 0,
     status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: 15)
-}
-fn poison_strike() -> ActionDef {
-  ActionDef(slug: "poison-strike", display_name: "Poison Strike", element: Earth,
-    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1400,
-    effect_kind: DamageAndStatus, base_power: 16,
-    status_kind: Some(Dot), status_duration_ms: 5000, status_value: 7)
 }
 fn toxic_coating() -> ActionDef {
   ActionDef(slug: "toxic-coating", display_name: "Toxic Coating", element: Earth,
@@ -448,18 +423,6 @@ fn chain_spark() -> ActionDef {
     target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
     effect_kind: Damage, base_power: 22,
     status_kind: None, status_duration_ms: 0, status_value: 0)
-}
-fn smoke_bomb() -> ActionDef {
-  ActionDef(slug: "smoke-bomb", display_name: "Smoke Bomb", element: Wind,
-    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1000,
-    effect_kind: Status, base_power: 0,
-    status_kind: Some(AttackBuff), status_duration_ms: 4000, status_value: -15)
-}
-fn time_slip() -> ActionDef {
-  ActionDef(slug: "time-slip", display_name: "Time Slip", element: Wind,
-    target_rule: AllySingle, energy_cost: 4, casting_time_ms: 1400,
-    effect_kind: Status, base_power: 0,
-    status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 18)
 }
 
 // -- Light --
@@ -493,9 +456,15 @@ fn rally_cry() -> ActionDef {
     effect_kind: Status, base_power: 0,
     status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 14)
 }
+fn time_slip() -> ActionDef {
+  ActionDef(slug: "time-slip", display_name: "Time Slip", element: Light,
+    target_rule: AllySingle, energy_cost: 4, casting_time_ms: 1400,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 5000, status_value: 18)
+}
 
 // -- Shadow --
-fn curse_dart() -> ActionDef {
+fn cursed_dart() -> ActionDef {
   ActionDef(slug: "cursed-dart", display_name: "Cursed Dart", element: Shadow,
     target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 900,
     effect_kind: DamageAndStatus, base_power: 12,
@@ -513,19 +482,19 @@ fn shadowstep() -> ActionDef {
     effect_kind: Damage, base_power: 26,
     status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-fn garrote() -> ActionDef {
-  ActionDef(slug: "garrote", display_name: "Garrote", element: Shadow,
-    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
-    effect_kind: DamageAndStatus, base_power: 14,
-    status_kind: Some(Dot), status_duration_ms: 6000, status_value: 8)
+fn smoke_bomb() -> ActionDef {
+  ActionDef(slug: "smoke-bomb", display_name: "Smoke Bomb", element: Shadow,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1000,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(AttackBuff), status_duration_ms: 4000, status_value: -15)
 }
 
 // -- Physical / Neutral --
-fn shiv() -> ActionDef {
-  ActionDef(slug: "shiv", display_name: "Shiv", element: Earth,
-    target_rule: EnemySingle, energy_cost: 1, casting_time_ms: 600,
-    effect_kind: Damage, base_power: 10,
-    status_kind: None, status_duration_ms: 0, status_value: 0)
+fn chain() -> ActionDef {
+  ActionDef(slug: "chain", display_name: "Chain", element: Earth,
+    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
+    effect_kind: DamageAndStatus, base_power: 14,
+    status_kind: Some(AttackBuff), status_duration_ms: 3000, status_value: -8)
 }
 fn charge() -> ActionDef {
   ActionDef(slug: "charge", display_name: "Charge", element: Earth,
@@ -545,11 +514,11 @@ fn execute() -> ActionDef {
     effect_kind: Damage, base_power: 40,
     status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-fn riposte() -> ActionDef {
-  ActionDef(slug: "riposte", display_name: "Riposte", element: Earth,
-    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
-    effect_kind: Status, base_power: 0,
-    status_kind: Some(ShieldBuff), status_duration_ms: 3000, status_value: 12)
+fn garrote() -> ActionDef {
+  ActionDef(slug: "garrote", display_name: "Garrote", element: Earth,
+    target_rule: EnemySingle, energy_cost: 3, casting_time_ms: 1200,
+    effect_kind: DamageAndStatus, base_power: 14,
+    status_kind: Some(Dot), status_duration_ms: 6000, status_value: 8)
 }
 fn intercept() -> ActionDef {
   ActionDef(slug: "intercept", display_name: "Intercept", element: Earth,
@@ -557,23 +526,29 @@ fn intercept() -> ActionDef {
     effect_kind: Shield, base_power: 25,
     status_kind: None, status_duration_ms: 0, status_value: 0)
 }
-fn taunt() -> ActionDef {
-  ActionDef(slug: "taunt", display_name: "Taunt", element: Earth,
-    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
-    effect_kind: Status, base_power: 0,
-    status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: 18)
-}
 fn mark_target() -> ActionDef {
   ActionDef(slug: "mark-target", display_name: "Mark Target", element: Earth,
     target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 800,
     effect_kind: Status, base_power: 0,
     status_kind: Some(ShieldBuff), status_duration_ms: 5000, status_value: -12)
 }
-fn chain() -> ActionDef {
-  ActionDef(slug: "chain", display_name: "Chain", element: Earth,
-    target_rule: EnemySingle, energy_cost: 2, casting_time_ms: 1000,
-    effect_kind: DamageAndStatus, base_power: 14,
-    status_kind: Some(AttackBuff), status_duration_ms: 3000, status_value: -8)
+fn riposte() -> ActionDef {
+  ActionDef(slug: "riposte", display_name: "Riposte", element: Earth,
+    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 3000, status_value: 12)
+}
+fn shiv() -> ActionDef {
+  ActionDef(slug: "shiv", display_name: "Shiv", element: Earth,
+    target_rule: EnemySingle, energy_cost: 1, casting_time_ms: 600,
+    effect_kind: Damage, base_power: 10,
+    status_kind: None, status_duration_ms: 0, status_value: 0)
+}
+fn taunt() -> ActionDef {
+  ActionDef(slug: "taunt", display_name: "Taunt", element: Earth,
+    target_rule: Self, energy_cost: 2, casting_time_ms: 600,
+    effect_kind: Status, base_power: 0,
+    status_kind: Some(ShieldBuff), status_duration_ms: 4000, status_value: 18)
 }
 
 // ============================================================================
