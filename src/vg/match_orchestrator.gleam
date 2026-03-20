@@ -1,4 +1,5 @@
 // Match Orchestrator - runs the matchmaking loop and match ticks
+import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/list
@@ -9,6 +10,7 @@ import vg/game_json
 import vg/match
 import vg/match_registry
 import vg/matchmaking
+import vg/types.{Active}
 
 const matchmaking_interval_ms = 1000
 const match_tick_interval_ms = 200
@@ -140,13 +142,43 @@ fn handle_message(
     }
 
     TickMatches(now) -> {
-      // Get all active matches and tick them
+      // Get all active matches, tick them, and push state to players
       let match_ids = match_registry.list_matches(state.match_registry)
       list.each(match_ids, fn(match_id) {
         case match_registry.get_match(state.match_registry, match_id) {
           Ok(match_actor) -> {
             let _ = match.tick_match(match_actor, now)
-            Nil
+            // Push state updates to all players in active matches
+            let match_state = match.get_state(match_actor)
+            case match_state.match.phase {
+              Active -> {
+                let _ = dict.each(match_state.players, fn(_pid, player) {
+                  let team_hand =
+                    list.filter(match_state.hand_slots, fn(slot) {
+                      slot.team == player.team
+                    })
+                  let msg =
+                    game_json.encode_server_message(game_json.StateUpdate(
+                      match: match_state.match,
+                      players: dict.values(match_state.players),
+                      team_states: dict.values(match_state.team_states),
+                      heroes: dict.values(match_state.heroes),
+                      hand: team_hand,
+                      statuses: dict.values(match_state.statuses),
+                      casts: dict.values(match_state.casts),
+                    ))
+                  let _ =
+                    connection_registry.send_message(
+                      state.connection_registry,
+                      player.player_id,
+                      msg,
+                    )
+                  Nil
+                })
+                Nil
+              }
+              _ -> Nil
+            }
           }
           Error(_) -> Nil
         }
