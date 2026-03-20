@@ -196,12 +196,20 @@ fn handle_message(
                                   let new_casts =
                                     dict.insert(state.casts, cast.cast_id, cast)
 
+                                  // Remove the used hand slot
+                                  let new_hands =
+                                    list.filter(state.hand_slots, fn(h) {
+                                      !{ h.team == team
+                                      && h.slot_index == hand_slot_index }
+                                    })
+
                                   process.send(reply_to, Ok(Nil))
                                   actor.continue(
                                     MatchActorState(
                                       ..state,
                                       team_states: new_team_states,
                                       casts: new_casts,
+                                      hand_slots: new_hands,
                                     ),
                                   )
                                 }
@@ -256,12 +264,15 @@ fn handle_message(
         Ok(team) -> {
           case dict.get(state.team_states, team) {
             Ok(team_state) -> {
-              case
-                match_logic.can_spend_energy(
-                  team_state,
-                  match_logic.reroll_cost,
-                )
-              {
+              // Free reroll if hand is empty (all cards used), otherwise costs energy
+              let team_hand =
+                list.filter(state.hand_slots, fn(h) { h.team == team })
+              let is_free = list.is_empty(team_hand)
+              let cost = case is_free {
+                True -> 0
+                False -> match_logic.reroll_cost
+              }
+              case is_free || match_logic.can_spend_energy(team_state, cost) {
                 True -> {
                   let new_hand = roll_hand_for_team(state.match.match_id, team)
 
@@ -271,10 +282,7 @@ fn handle_message(
                   let all_hands = list.append(other_hands, new_hand)
 
                   let new_team_state =
-                    match_logic.spend_energy(
-                      team_state,
-                      match_logic.reroll_cost,
-                    )
+                    match_logic.spend_energy(team_state, cost)
                   let new_team_states =
                     dict.insert(state.team_states, team, new_team_state)
 
