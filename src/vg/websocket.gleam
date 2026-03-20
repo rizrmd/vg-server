@@ -5,6 +5,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/option.{type Option, None, Some}
+import vg/types.{Active, Waiting}
 import mist.{type ResponseData}
 import pog
 import vg/connection_registry
@@ -198,13 +199,53 @@ fn handle_authenticate(
                   player.email,
                 ),
               )
-              mist.continue(
-                WsState(
-                  ..state,
-                  player_id: player.player_id,
-                  authenticated: True,
-                ),
-              )
+              // Check if player is in an active match and rejoin
+              let #(rejoin_match_id, rejoin_team) =
+                find_player_active_match(
+                  state.match_registry,
+                  player.player_id,
+                )
+              case rejoin_match_id {
+                Some(match_id) -> {
+                  let team = case rejoin_team {
+                    Some(t) -> t
+                    None -> 1
+                  }
+                  send_server_message(conn, MatchFound(match_id, team))
+                  case match_registry.get_match(state.match_registry, match_id) {
+                    Ok(match_actor) ->
+                      send_match_state(
+                        conn,
+                        match_actor,
+                        WsState(
+                          ..state,
+                          player_id: player.player_id,
+                          authenticated: True,
+                          current_match_id: Some(match_id),
+                          current_team: Some(team),
+                        ),
+                      )
+                    Error(_) -> Nil
+                  }
+                  mist.continue(
+                    WsState(
+                      ..state,
+                      player_id: player.player_id,
+                      authenticated: True,
+                      current_match_id: Some(match_id),
+                      current_team: Some(team),
+                    ),
+                  )
+                }
+                None ->
+                  mist.continue(
+                    WsState(
+                      ..state,
+                      player_id: player.player_id,
+                      authenticated: True,
+                    ),
+                  )
+              }
             }
             Error(_) -> {
               send_server_message(
@@ -560,6 +601,42 @@ pub fn notify_match_found(
   team: Int,
 ) -> Nil {
   send_server_message(conn, MatchFound(match_id, team))
+}
+
+fn find_player_active_match(
+  registry: Subject(match_registry.Message),
+  player_id: String,
+) -> #(Option(String), Option(Int)) {
+  let match_ids = match_registry.list_matches(registry)
+  find_player_in_matches(registry, match_ids, player_id)
+}
+
+fn find_player_in_matches(
+  registry: Subject(match_registry.Message),
+  match_ids: List(String),
+  player_id: String,
+) -> #(Option(String), Option(Int)) {
+  case match_ids {
+    [] -> #(None, None)
+    [match_id, ..rest] -> {
+      case match_registry.get_match(registry, match_id) {
+        Ok(match_actor) -> {
+          let state = match.get_state(match_actor)
+          case state.match.phase {
+            Active | Waiting -> {
+              case dict.get(state.players, player_id) {
+                Ok(player) -> #(Some(match_id), Some(player.team))
+                Error(_) ->
+                  find_player_in_matches(registry, rest, player_id)
+              }
+            }
+            _ -> find_player_in_matches(registry, rest, player_id)
+          }
+        }
+        Error(_) -> find_player_in_matches(registry, rest, player_id)
+      }
+    }
+  }
 }
 
 fn get_timestamp() -> Int {
