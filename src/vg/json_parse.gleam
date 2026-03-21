@@ -14,8 +14,15 @@ pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
 
   case msg_type {
     "authenticate" -> {
-      use id_token <- result.try(get_json_string_field(json_str, "id_token"))
-      Ok(Authenticate(id_token: id_token))
+      let id_token = case get_json_string_field(json_str, "id_token") {
+        Ok(t) -> t
+        Error(_) -> ""
+      }
+      let session_token = case get_json_string_field(json_str, "session_token") {
+        Ok(t) -> t
+        Error(_) -> ""
+      }
+      Ok(Authenticate(id_token: id_token, session_token: session_token))
     }
     "upsert_profile" -> {
       use display_name <- result.try(get_json_string_field(

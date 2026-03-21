@@ -121,6 +121,20 @@ pub fn init(db_url: String) -> Result(pog.Connection, String) {
             Error(_) -> Nil
           }
 
+          // Create sessions table
+          let sessions_sql =
+            "
+            CREATE TABLE IF NOT EXISTS sessions (
+              token TEXT PRIMARY KEY,
+              player_id TEXT NOT NULL REFERENCES players(player_id),
+              created_at BIGINT NOT NULL
+            )
+          "
+          case pog.query(sessions_sql) |> pog.execute(conn) {
+            Ok(_) -> Nil
+            Error(_) -> Nil
+          }
+
           // Create indexes
           let indexes = [
             "CREATE INDEX IF NOT EXISTS idx_match_results_player1 ON match_results(player1_id)",
@@ -129,6 +143,7 @@ pub fn init(db_url: String) -> Result(pog.Connection, String) {
             "CREATE INDEX IF NOT EXISTS idx_player_stats_rating ON player_stats(rating DESC)",
             "CREATE INDEX IF NOT EXISTS idx_player_stats_wins ON player_stats(matches_won DESC)",
             "CREATE INDEX IF NOT EXISTS idx_players_google_sub ON players(google_sub)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_player_id ON sessions(player_id)",
           ]
           list.each(indexes, fn(sql) {
             case pog.query(sql) |> pog.execute(conn) {
@@ -484,6 +499,71 @@ fn player_decoder() -> Decoder(Player) {
     updated_at: updated_at,
   ))
 }
+
+// ============================================================================
+// Session token functions
+// ============================================================================
+
+/// Create a session token for a player. Returns the token string.
+pub fn create_session(
+  conn: pog.Connection,
+  player_id: String,
+  now: Int,
+) -> Result(String, pog.QueryError) {
+  let token = generate_token()
+  let sql =
+    "
+    INSERT INTO sessions (token, player_id, created_at)
+    VALUES ($1, $2, $3)
+  "
+  use _ <- result.try(
+    pog.query(sql)
+    |> pog.parameter(pog.text(token))
+    |> pog.parameter(pog.text(player_id))
+    |> pog.parameter(pog.int(now))
+    |> pog.execute(conn),
+  )
+  Ok(token)
+}
+
+/// Look up a session token. Returns the associated Player if valid.
+pub fn lookup_session(
+  conn: pog.Connection,
+  token: String,
+) -> Result(Option(Player), pog.QueryError) {
+  let sql =
+    "
+    SELECT p.player_id, p.google_sub, p.email, p.display_name, p.avatar_url, p.created_at, p.updated_at
+    FROM sessions s
+    JOIN players p ON s.player_id = p.player_id
+    WHERE s.token = $1
+  "
+  use resp <- result.try(
+    pog.query(sql)
+    |> pog.parameter(pog.text(token))
+    |> pog.returning(player_decoder())
+    |> pog.execute(conn),
+  )
+  case resp.rows {
+    [player, ..] -> Ok(Some(player))
+    [] -> Ok(None)
+  }
+}
+
+/// Delete all sessions for a player (e.g. on logout).
+pub fn delete_player_sessions(
+  conn: pog.Connection,
+  player_id: String,
+) -> Result(Nil, pog.QueryError) {
+  let sql = "DELETE FROM sessions WHERE player_id = $1"
+  pog.query(sql)
+  |> pog.parameter(pog.text(player_id))
+  |> pog.execute(conn)
+  |> result.map(fn(_) { Nil })
+}
+
+@external(erlang, "vg_server_ffi", "generate_token")
+fn generate_token() -> String
 
 /// Find or create a player by Google sub. Updates display_name/email/avatar on each login.
 pub fn get_or_create_google_player(

@@ -133,7 +133,8 @@ fn handle_client_message(
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case msg {
-    Authenticate(id_token) -> handle_authenticate(state, id_token, conn)
+    Authenticate(id_token, session_token) ->
+      handle_authenticate(state, id_token, session_token, conn)
     _ -> {
       case state.authenticated {
         False -> {
@@ -152,6 +153,7 @@ fn handle_client_message(
 fn handle_authenticate(
   state: WsState,
   id_token: String,
+  session_token: String,
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case state.db_conn {
@@ -163,6 +165,38 @@ fn handle_authenticate(
       mist.continue(state)
     }
     Some(db_conn) -> {
+      // Try session token first, then fall back to Google id_token
+      case session_token {
+        "" -> authenticate_with_google(state, id_token, db_conn, conn)
+        _ -> {
+          case db.lookup_session(db_conn, session_token) {
+            Ok(Some(player)) ->
+              complete_authentication(state, player, session_token, conn)
+            _ ->
+              // Session invalid/expired, try Google token
+              authenticate_with_google(state, id_token, db_conn, conn)
+          }
+        }
+      }
+    }
+  }
+}
+
+fn authenticate_with_google(
+  state: WsState,
+  id_token: String,
+  db_conn: pog.Connection,
+  conn: mist.WebsocketConnection,
+) -> mist.Next(WsState, String) {
+  case id_token {
+    "" -> {
+      send_server_message(
+        conn,
+        AuthError("INVALID_TOKEN", "No valid token provided"),
+      )
+      mist.continue(state)
+    }
+    _ -> {
       case
         google_auth.verify_google_token(id_token, state.google_client_id)
       {
@@ -179,74 +213,12 @@ fn handle_authenticate(
             )
           {
             Ok(player) -> {
-              // Register connection with persistent player_id
-              connection_registry.register_connection(
-                state.connection_registry,
-                player.player_id,
-                conn,
-              )
-              // Also set up player profile
-              let _ =
-                player_registry.upsert_profile(
-                  state.player_registry,
-                  player.player_id,
-                  player.display_name,
-                )
-              send_server_message(
-                conn,
-                Authenticated(
-                  player.player_id,
-                  player.display_name,
-                  player.email,
-                ),
-              )
-              // Check if player is in an active match and rejoin
-              let #(rejoin_match_id, rejoin_team) =
-                find_player_active_match(
-                  state.match_registry,
-                  player.player_id,
-                )
-              case rejoin_match_id {
-                Some(match_id) -> {
-                  let team = case rejoin_team {
-                    Some(t) -> t
-                    None -> 1
-                  }
-                  send_server_message(conn, MatchFound(match_id, team))
-                  case match_registry.get_match(state.match_registry, match_id) {
-                    Ok(match_actor) ->
-                      send_match_state(
-                        conn,
-                        match_actor,
-                        WsState(
-                          ..state,
-                          player_id: player.player_id,
-                          authenticated: True,
-                          current_match_id: Some(match_id),
-                          current_team: Some(team),
-                        ),
-                      )
-                    Error(_) -> Nil
-                  }
-                  mist.continue(
-                    WsState(
-                      ..state,
-                      player_id: player.player_id,
-                      authenticated: True,
-                      current_match_id: Some(match_id),
-                      current_team: Some(team),
-                    ),
-                  )
-                }
-                None ->
-                  mist.continue(
-                    WsState(
-                      ..state,
-                      player_id: player.player_id,
-                      authenticated: True,
-                    ),
-                  )
+              // Create a new session token for the client
+              let new_session = case db.create_session(db_conn, player.player_id, now) {
+                Ok(token) -> token
+                Error(_) -> ""
               }
+              complete_authentication(state, player, new_session, conn)
             }
             Error(_) -> {
               send_server_message(
@@ -266,13 +238,90 @@ fn handle_authenticate(
   }
 }
 
+fn complete_authentication(
+  state: WsState,
+  player: db.Player,
+  session_token: String,
+  conn: mist.WebsocketConnection,
+) -> mist.Next(WsState, String) {
+  // Register connection with persistent player_id
+  connection_registry.register_connection(
+    state.connection_registry,
+    player.player_id,
+    conn,
+  )
+  // Also set up player profile
+  let _ =
+    player_registry.upsert_profile(
+      state.player_registry,
+      player.player_id,
+      player.display_name,
+    )
+  send_server_message(
+    conn,
+    Authenticated(
+      player.player_id,
+      player.display_name,
+      player.email,
+      session_token,
+    ),
+  )
+  // Check if player is in an active match and rejoin
+  let #(rejoin_match_id, rejoin_team) =
+    find_player_active_match(
+      state.match_registry,
+      player.player_id,
+    )
+  case rejoin_match_id {
+    Some(match_id) -> {
+      let team = case rejoin_team {
+        Some(t) -> t
+        None -> 1
+      }
+      send_server_message(conn, MatchFound(match_id, team))
+      case match_registry.get_match(state.match_registry, match_id) {
+        Ok(match_actor) ->
+          send_match_state(
+            conn,
+            match_actor,
+            WsState(
+              ..state,
+              player_id: player.player_id,
+              authenticated: True,
+              current_match_id: Some(match_id),
+              current_team: Some(team),
+            ),
+          )
+        Error(_) -> Nil
+      }
+      mist.continue(
+        WsState(
+          ..state,
+          player_id: player.player_id,
+          authenticated: True,
+          current_match_id: Some(match_id),
+          current_team: Some(team),
+        ),
+      )
+    }
+    None ->
+      mist.continue(
+        WsState(
+          ..state,
+          player_id: player.player_id,
+          authenticated: True,
+        ),
+      )
+  }
+}
+
 fn handle_authenticated_message(
   state: WsState,
   msg: ClientMessage,
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case msg {
-    Authenticate(_) -> mist.continue(state)
+    Authenticate(_, _) -> mist.continue(state)
     UpsertProfile(display_name) -> {
       case
         player_registry.upsert_profile(
