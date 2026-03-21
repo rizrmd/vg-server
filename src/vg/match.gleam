@@ -317,6 +317,8 @@ fn handle_message(
     Tick(now, reply_to) -> {
       case state.match.phase {
         Active -> {
+          let active_statuses = prune_expired_statuses(state.statuses, now)
+
           // Regenerate energy for both teams
           let new_team_states =
             dict.fold(state.team_states, dict.new(), fn(acc, team, ts) {
@@ -325,7 +327,8 @@ fn handle_message(
 
           // Resolve casts that are ready
           let #(new_casts, new_heroes, new_statuses) =
-            resolve_casts(state.casts, state.heroes, state.statuses, now)
+            resolve_casts(state.casts, state.heroes, active_statuses, now)
+          let active_casts = prune_resolved_casts(new_casts)
 
           // Check win condition
           let winner = match_logic.check_win_condition(new_heroes)
@@ -393,7 +396,7 @@ fn handle_message(
             heroes: new_heroes,
             hand_slots: state.hand_slots,
             statuses: new_statuses,
-            casts: new_casts,
+            casts: active_casts,
             db_conn: state.db_conn,
             match_saved: match_saved,
           ))
@@ -660,6 +663,29 @@ fn resolve_casts(
         }
       }
       _, _ -> #(current_casts, current_heroes, current_statuses)
+    }
+  })
+}
+
+fn prune_expired_statuses(
+  statuses: Dict(String, MatchStatus),
+  now: Int,
+) -> Dict(String, MatchStatus) {
+  dict.fold(statuses, dict.new(), fn(acc, id, status) {
+    case status.expires_at > now {
+      True -> dict.insert(acc, id, status)
+      False -> acc
+    }
+  })
+}
+
+fn prune_resolved_casts(
+  casts: Dict(String, MatchCast),
+) -> Dict(String, MatchCast) {
+  dict.fold(casts, dict.new(), fn(acc, id, cast) {
+    case cast.resolved {
+      True -> acc
+      False -> dict.insert(acc, id, cast)
     }
   })
 }
