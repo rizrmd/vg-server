@@ -155,10 +155,19 @@ pub fn spend_energy(team_state: MatchTeamState, amount: Int) -> MatchTeamState {
 pub fn regen_energy(team_state: MatchTeamState, now: Int) -> MatchTeamState {
   let elapsed = now - team_state.last_energy_at
   let regen_amount = calculate_energy_regen(elapsed)
-  let new_energy =
-    int.min(team_state.energy_max, team_state.energy + regen_amount)
-
-  MatchTeamState(..team_state, energy: new_energy, last_energy_at: now)
+  case regen_amount > 0 {
+    True -> {
+      let new_energy =
+        int.min(team_state.energy_max, team_state.energy + regen_amount)
+      let consumed_ms = regen_amount * 1000 / energy_regen_per_second
+      MatchTeamState(
+        ..team_state,
+        energy: new_energy,
+        last_energy_at: team_state.last_energy_at + consumed_ms,
+      )
+    }
+    False -> team_state
+  }
 }
 
 // ============================================================================
