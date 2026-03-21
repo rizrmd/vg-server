@@ -295,10 +295,7 @@ fn create_status_from_action(
 
 pub fn roll_hand() -> List(String) {
   let all_actions = content.get_all_action_slugs()
-  // Take random 5 actions from the pool
-  // For now, just take first 5 for simplicity
-  // TODO: Implement proper random selection
-  list.take(all_actions, hand_size)
+  sample_without_replacement(all_actions, hand_size)
 }
 
 pub fn reroll_hand() -> #(List(String), Int) {
@@ -326,6 +323,31 @@ fn count_alive_heroes(heroes: Dict(String, MatchHero), team: Int) -> Int {
   |> dict.values()
   |> list.filter(fn(h) { h.team == team && h.alive })
   |> list.length()
+}
+
+fn sample_without_replacement(
+  items: List(a),
+  count: Int,
+) -> List(a) {
+  case count <= 0 || list.is_empty(items) {
+    True -> []
+    False -> {
+      let index = int.random(list.length(items))
+      let #(picked, remaining) = remove_at(items, index)
+      [picked, ..sample_without_replacement(remaining, count - 1)]
+    }
+  }
+}
+
+fn remove_at(items: List(a), index: Int) -> #(a, List(a)) {
+  case items, index {
+    [item, ..rest], 0 -> #(item, rest)
+    [item, ..rest], _ -> {
+      let #(picked, remaining) = remove_at(rest, index - 1)
+      #(picked, [item, ..remaining])
+    }
+    [], _ -> panic as "remove_at called with invalid index"
+  }
 }
 
 // ============================================================================

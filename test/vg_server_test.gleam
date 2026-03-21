@@ -238,6 +238,7 @@ pub fn roll_hand_test() {
   let hand = match_logic.roll_hand()
   should.equal(list.length(hand), 5)
   // hand_size = 5
+  should.equal(list.length(list.unique(hand)), 5)
 }
 
 pub fn energy_management_test() {
