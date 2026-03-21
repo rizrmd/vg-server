@@ -468,7 +468,8 @@ fn handle_authenticated_message(
       }
     }
 
-    LeaveMatch(_match_id) -> {
+    LeaveMatch(match_id) -> {
+      match_registry.remove_match(state.match_registry, match_id)
       send_server_message(conn, MatchmakingLeft)
       mist.continue(
         WsState(..state, current_match_id: None, current_team: None),
