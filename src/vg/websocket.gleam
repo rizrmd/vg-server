@@ -157,19 +157,12 @@ fn handle_authenticate(
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case state.db_conn {
-    // DEV MODE: Allow login without database
     None -> {
-      let now = get_timestamp()
-      let dev_player = db.Player(
-        player_id: "dev_" <> int.to_string(int.random(1_000_000)),
-        google_sub: "dev_google_sub",
-        email: "dev@localhost",
-        display_name: "DevPlayer",
-        avatar_url: "",
-        created_at: now,
-        updated_at: now,
+      send_server_message(
+        conn,
+        AuthError("NO_DB", "Database not available for authentication"),
       )
-      complete_authentication(state, dev_player, "", conn)
+      mist.continue(state)
     }
     Some(db_conn) -> {
       // Try session token first, then fall back to Google id_token
@@ -196,25 +189,51 @@ fn authenticate_with_google(
   conn: mist.WebsocketConnection,
 ) -> mist.Next(WsState, String) {
   case id_token {
-    // DEV MODE: Accept any token for local testing without OAuth
-    _ -> {
-      let now = get_timestamp()
-      // Create dev player - bypass Google token verification
-      let dev_player = db.Player(
-        player_id: "dev_" <> int.to_string(int.random(1_000_000)),
-        google_sub: "dev_google_sub",
-        email: "dev@localhost",
-        display_name: "DevPlayer",
-        avatar_url: "",
-        created_at: now,
-        updated_at: now,
+    "" -> {
+      send_server_message(
+        conn,
+        AuthError("INVALID_TOKEN", "No valid token provided"),
       )
-      // Create session for dev player
-      let new_session = case db.create_session(db_conn, dev_player.player_id, now) {
-        Ok(token) -> token
-        Error(_) -> ""
+      mist.continue(state)
+    }
+    _ -> {
+      case
+        google_auth.verify_google_token(id_token, state.google_client_id)
+      {
+        Ok(token_info) -> {
+          let now = get_timestamp()
+          case
+            db.get_or_create_google_player(
+              db_conn,
+              token_info.sub,
+              token_info.email,
+              token_info.name,
+              token_info.picture,
+              now,
+            )
+          {
+            Ok(player) -> {
+              // Create a new session token for the client
+              let new_session = case db.create_session(db_conn, player.player_id, now) {
+                Ok(token) -> token
+                Error(_) -> ""
+              }
+              complete_authentication(state, player, new_session, conn)
+            }
+            Error(_) -> {
+              send_server_message(
+                conn,
+                AuthError("DB_ERROR", "Failed to create player account"),
+              )
+              mist.continue(state)
+            }
+          }
+        }
+        Error(err) -> {
+          send_server_message(conn, AuthError("INVALID_TOKEN", err))
+          mist.continue(state)
+        }
       }
-      complete_authentication(state, dev_player, new_session, conn)
     }
   }
 }
