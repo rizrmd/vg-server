@@ -22,7 +22,7 @@ pub type ClientMessage {
     hero_slug_2: String,
     hero_slug_3: String,
   )
-  CastAction(match_id: String, caster_slot: Int, hand_slot_index: Int)
+  CastAction(match_id: String, caster_slot: Int, hand_slot_index: Int, target_slot: Int)
   RerollHand(match_id: String)
   LeaveMatch(match_id: String)
   GetMatchHistory(limit: Int, offset: Int)

@@ -44,10 +44,15 @@ pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
         json_str,
         "hand_slot_index",
       ))
+      use target_slot <- result.try(get_json_int_field(
+        json_str,
+        "target_slot",
+      ))
       Ok(CastAction(
         match_id: match_id,
         caster_slot: caster_slot,
         hand_slot_index: hand_slot,
+        target_slot: target_slot,
       ))
     }
     "reroll_hand" -> {

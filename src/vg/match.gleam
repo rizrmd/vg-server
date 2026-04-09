@@ -40,11 +40,12 @@ pub type Message {
     team: Int,
     reply_to: Subject(Result(Nil, String)),
   )
-  // CastAction: caster_slot is the hero slot (1-3); target resolution is internal
+  // CastAction: caster_slot is the hero slot (1-3); target_slot is the enemy slot (1-3)
   CastAction(
     player_id: String,
     caster_slot: Int,
     hand_slot_index: Int,
+    target_slot: Int,
     reply_to: Subject(Result(Nil, String)),
   )
   RerollHand(
@@ -143,7 +144,7 @@ fn handle_message(
       handle_start_match(state, reply_to, hero_slugs_team1, hero_slugs_team2)
     }
 
-    CastAction(player_id, caster_slot, hand_slot_index, reply_to) -> {
+    CastAction(player_id, caster_slot, hand_slot_index, target_slot, reply_to) -> {
       case state.match.phase {
         Active -> {
           case get_player_team(state, player_id) {
@@ -163,6 +164,7 @@ fn handle_message(
                               team,
                               caster,
                               action.target_rule,
+                              target_slot,
                             )
 
                           case target_result {
@@ -495,6 +497,7 @@ fn resolve_target(
   caster_team: Int,
   caster: MatchHero,
   target_rule: types.TargetRule,
+  target_slot: Int,
 ) -> Result(MatchHero, Nil) {
   case target_rule {
     types.Self -> Ok(caster)
@@ -505,7 +508,8 @@ fn resolve_target(
         1 -> 2
         _ -> 1
       }
-      get_first_alive_hero(heroes, target_team)
+      // Use the client-provided target_slot instead of auto-resolving
+      get_hero_by_slot(heroes, target_team, target_slot)
     }
     types.AnySingle -> resolve_any_auto_target(heroes, caster_team, caster)
     types.AllyAuto -> Ok(caster)
@@ -514,7 +518,8 @@ fn resolve_target(
         1 -> 2
         _ -> 1
       }
-      get_first_alive_hero(heroes, target_team)
+      // Use the client-provided target_slot instead of auto-resolving
+      get_hero_by_slot(heroes, target_team, target_slot)
     }
     types.AnyAuto -> resolve_any_auto_target(heroes, caster_team, caster)
   }
@@ -746,9 +751,10 @@ pub fn cast_action_with_caster(
   player_id: String,
   caster_slot: Int,
   hand_slot_index: Int,
+  target_slot: Int,
 ) -> Result(Nil, String) {
   process.call(match_actor, waiting: 5000, sending: fn(subject) {
-    CastAction(player_id, caster_slot, hand_slot_index, subject)
+    CastAction(player_id, caster_slot, hand_slot_index, target_slot, subject)
   })
 }
 
@@ -757,8 +763,9 @@ pub fn cast_action(
   player_id: String,
   caster_slot: Int,
   hand_slot_index: Int,
+  target_slot: Int,
 ) -> Result(Nil, String) {
-  cast_action_with_caster(match_actor, player_id, caster_slot, hand_slot_index)
+  cast_action_with_caster(match_actor, player_id, caster_slot, hand_slot_index, target_slot)
 }
 
 pub fn reroll_hand(
