@@ -272,12 +272,19 @@ fn complete_authentication(
       player.display_name,
     )
 
-  // Get ftue_completed status from player_stats
+  // Ensure player_stats row exists and read ftue status.
   let ftue_completed = case state.db_conn {
     Some(db_conn) -> {
-      case db.get_player_stats(db_conn, player.player_id) {
-        Ok(Some(stats)) -> stats.ftue_completed
-        _ -> False
+      case
+        db.get_or_create_player_stats(
+          db_conn,
+          player.player_id,
+          player.display_name,
+          get_timestamp(),
+        )
+      {
+        Ok(stats) -> stats.ftue_completed
+        Error(_) -> False
       }
     }
     None -> False

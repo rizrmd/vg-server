@@ -105,6 +105,26 @@ pub fn init(db_url: String) -> Result(pog.Connection, String) {
             Error(_) -> Nil
           }
 
+          // Backward-compatible migration for existing databases created before ftue_completed was added.
+          case
+            pog.query(
+              "ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ftue_completed BOOLEAN DEFAULT FALSE",
+            )
+            |> pog.execute(conn)
+          {
+            Ok(_) -> Nil
+            Error(_) -> Nil
+          }
+          case
+            pog.query(
+              "UPDATE player_stats SET ftue_completed = FALSE WHERE ftue_completed IS NULL",
+            )
+            |> pog.execute(conn)
+          {
+            Ok(_) -> Nil
+            Error(_) -> Nil
+          }
+
           // Create players table
           let players_sql =
             "
