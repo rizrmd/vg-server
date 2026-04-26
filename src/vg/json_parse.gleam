@@ -3,10 +3,10 @@ import gleam/int
 import gleam/result
 import gleam/string
 import vg/game_json.{
-  type ClientMessage, Authenticate, CastAction, ChangeTrainingEnemies,
-  CompleteFtue, GetLeaderboard, GetMatchHistory, GetMatchState, GetPlayerStats,
-  LeaveMatch, QueueMatchmaking, RerollHand, SetHeroTarget, StartTraining,
-  UpsertProfile,
+  type ClientMessage, Authenticate, CastAction, CastSkill,
+  ChangeTrainingEnemies, CompleteFtue, GetLeaderboard, GetMatchHistory,
+  GetMatchState, GetPlayerStats, LeaveMatch, QueueMatchmaking, RerollHand,
+  SetHeroTarget, StartTraining, UpsertProfile,
 }
 
 pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
@@ -54,6 +54,16 @@ pub fn parse_client_message(json_str: String) -> Result(ClientMessage, Nil) {
         caster_slot: caster_slot,
         hand_slot_index: hand_slot,
         target_slot: target_slot,
+      ))
+    }
+    "cast_skill" -> {
+      use match_id <- result.try(get_json_string_field(json_str, "match_id"))
+      use caster_slot <- result.try(get_json_int_field(json_str, "caster_slot"))
+      use ability_id <- result.try(get_json_string_field(json_str, "ability_id"))
+      Ok(CastSkill(
+        match_id: match_id,
+        caster_slot: caster_slot,
+        ability_id: ability_id,
       ))
     }
     "set_hero_target" -> {

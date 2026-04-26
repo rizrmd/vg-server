@@ -4,16 +4,19 @@ import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{type Option, None, Some}
 import vg/actions
 import vg/content
 import vg/types.{
-  type ActionDef, type Element, type HeroDef, type MatchCast, type MatchHero,
-  type MatchStatus, type MatchTeamState, type TargetRule, AllyAuto, AllySingle,
-  AnyAuto, AnySingle, AttackBuff, Cleanse, Damage, DamageAndStatus, DefenseBuff,
-  Dot, Earth, EnemyAuto, EnemySingle, Fire, Heal, Hot, Ice, Light, MatchCast,
-  MatchHero, MatchStatus, MatchTeamState, NoTarget, NoWinner, Self, Shadow,
-  Shield, ShieldBuff, Status, Stun, Team1, Team2, Wind,
+  type AbilityDef, type AbilityEffect, type ActionDef, type Element,
+  type HeroDef, type MatchCast, type MatchHero, type MatchStatus,
+  type MatchTeamState, type TargetRule, AllyAuto, AllySingle, AnyAuto, AnySingle,
+  AttackBuff, Cleanse, Damage, DamageAndStatus, DefenseBuff, Dot, Earth,
+  EffApplyStatus, EffDamage, EffHeal, EnemyAuto, EnemySingle, Fire, Heal, Hot,
+  Ice, Light, MatchCast, MatchHero, MatchStatus, MatchTeamState, NoTarget,
+  NoWinner, Self, Shadow, Shield, ShieldBuff, Status, Stun, Team1, Team2,
+  TgtAllAllies, TgtAllEnemies, TgtAttacker, TgtLowestHpAlly, TgtPrimary,
+  TgtRandomEnemy, TgtSelf, Wind,
 }
 
 // ============================================================================
@@ -34,6 +37,11 @@ pub const heroes_per_team = 3
 
 // Tick interval for DoT/Hot effects (ms)
 pub const dot_tick_interval_ms = 1000
+
+// Hero mana defaults
+pub const hero_mana_max = 10
+
+pub const hero_mana_regen_per_second = 1
 
 // ============================================================================
 // Active status helpers
@@ -387,7 +395,7 @@ pub fn resolve_cast(
   }
 }
 
-fn apply_damage(hero: MatchHero, damage: Int) -> MatchHero {
+pub fn apply_damage(hero: MatchHero, damage: Int) -> MatchHero {
   let new_hp = int.max(0, hero.hp_current - damage)
   MatchHero(..hero, hp_current: new_hp, alive: new_hp > 0)
 }
@@ -527,7 +535,7 @@ fn cleanse_negative_statuses(
   #(new_statuses, negative)
 }
 
-fn apply_heal(hero: MatchHero, heal: Int) -> MatchHero {
+pub fn apply_heal(hero: MatchHero, heal: Int) -> MatchHero {
   let new_hp = int.min(hero.hp_max, hero.hp_current + heal)
   MatchHero(..hero, hp_current: new_hp)
 }
@@ -692,6 +700,9 @@ pub fn spawn_hero(
         hp_max: hero_def.max_hp,
         alive: True,
         busy_until: 0,
+        mana_current: 0,
+        mana_max: hero_mana_max,
+        last_mana_at: now,
       ))
     }
     Error(_) -> Error(Nil)
@@ -701,6 +712,176 @@ pub fn spawn_hero(
 // ============================================================================
 // Team state initialization
 // ============================================================================
+
+// ============================================================================
+// Mana management
+// ============================================================================
+
+pub fn regen_hero_mana(hero: MatchHero, now: Int) -> MatchHero {
+  let elapsed = now - hero.last_mana_at
+  let regen_amount = elapsed / 1000 * hero_mana_regen_per_second
+  case regen_amount > 0 {
+    True -> {
+      let new_mana = int.min(hero.mana_max, hero.mana_current + regen_amount)
+      let consumed_ms = regen_amount * 1000 / hero_mana_regen_per_second
+      MatchHero(
+        ..hero,
+        mana_current: new_mana,
+        last_mana_at: hero.last_mana_at + consumed_ms,
+      )
+    }
+    False -> hero
+  }
+}
+
+pub fn can_spend_mana(hero: MatchHero, amount: Int) -> Bool {
+  hero.mana_current >= amount
+}
+
+pub fn spend_mana(hero: MatchHero, amount: Int) -> MatchHero {
+  MatchHero(..hero, mana_current: int.max(0, hero.mana_current - amount))
+}
+
+// ============================================================================
+// Ability target resolution
+// ============================================================================
+
+pub fn resolve_ability_targets(
+  ability: AbilityDef,
+  caster: MatchHero,
+  heroes: Dict(String, MatchHero),
+) -> List(MatchHero) {
+  case ability.target {
+    TgtSelf -> [caster]
+    TgtAllAllies -> alive_allies(heroes, caster.team)
+    TgtAllEnemies -> alive_enemies(heroes, caster.team)
+    TgtLowestHpAlly ->
+      case lowest_hp_hero(alive_allies(heroes, caster.team)) {
+        Ok(h) -> [h]
+        Error(_) -> []
+      }
+    TgtPrimary ->
+      case alive_enemies(heroes, caster.team) {
+        [first, ..] -> [first]
+        [] -> []
+      }
+    TgtAttacker -> [caster]
+    TgtRandomEnemy ->
+      case alive_enemies(heroes, caster.team) {
+        [] -> []
+        enemies -> {
+          let idx = int.random(list.length(enemies))
+          case list_at_index(enemies, idx) {
+            Ok(h) -> [h]
+            Error(_) -> []
+          }
+        }
+      }
+  }
+}
+
+fn alive_allies(heroes: Dict(String, MatchHero), team: Int) -> List(MatchHero) {
+  heroes
+  |> dict.values()
+  |> list.filter(fn(h) { h.team == team && h.alive })
+}
+
+fn alive_enemies(heroes: Dict(String, MatchHero), team: Int) -> List(MatchHero) {
+  heroes
+  |> dict.values()
+  |> list.filter(fn(h) { h.team != team && h.alive })
+}
+
+fn lowest_hp_hero(heroes: List(MatchHero)) -> Result(MatchHero, Nil) {
+  case heroes {
+    [] -> Error(Nil)
+    [first, ..rest] ->
+      Ok(list.fold(rest, first, fn(acc, h) {
+        case h.hp_current < acc.hp_current {
+          True -> h
+          False -> acc
+        }
+      }))
+  }
+}
+
+fn list_at_index(items: List(a), idx: Int) -> Result(a, Nil) {
+  case items, idx {
+    [item, ..], 0 -> Ok(item)
+    [_, ..rest], n if n > 0 -> list_at_index(rest, n - 1)
+    _, _ -> Error(Nil)
+  }
+}
+
+// ============================================================================
+// Ability effect application
+// ============================================================================
+
+// Compute ability heal scaled by caster attack and light affinity.
+pub fn calculate_ability_heal(base_power: Int, caster_def: HeroDef) -> Int {
+  let base = int.to_float(base_power)
+  let attack_mult = int.to_float(caster_def.attack) /. 100.0
+  let affinity_mult =
+    1.0 +. { int.to_float(caster_def.light_affinity) /. 100.0 }
+  let raw = base *. attack_mult *. affinity_mult
+  let v = float.truncate(raw)
+  case v {
+    n if n < 1 -> 1
+    n -> n
+  }
+}
+
+// Compute ability damage (untyped, no element affinity).
+pub fn calculate_ability_damage(
+  base_power: Int,
+  caster_def: HeroDef,
+  target_def: HeroDef,
+) -> Int {
+  let base = int.to_float(base_power)
+  let attack_mult = int.to_float(caster_def.attack) /. 100.0
+  let defense_mit =
+    100.0 /. { 100.0 +. int.to_float(target_def.defense) }
+  let raw = base *. attack_mult *. defense_mit
+  let v = float.truncate(raw)
+  case v {
+    n if n < 1 -> 1
+    n -> n
+  }
+}
+
+// Apply a single effect from an ability to one target.
+// Returns updated hero and either a new status (or Nil).
+pub fn apply_ability_effect(
+  effect: AbilityEffect,
+  caster_def: HeroDef,
+  target: MatchHero,
+  target_def: HeroDef,
+  match_id: String,
+  now: Int,
+) -> #(MatchHero, Option(MatchStatus)) {
+  case effect {
+    EffHeal(base_power) -> {
+      let amount = calculate_ability_heal(base_power, caster_def)
+      #(apply_heal(target, amount), None)
+    }
+    EffDamage(base_power) -> {
+      let amount = calculate_ability_damage(base_power, caster_def, target_def)
+      #(apply_damage(target, amount), None)
+    }
+    EffApplyStatus(status, duration_ms, value) -> {
+      let s =
+        MatchStatus(
+          status_id: generate_id("ability_status", now),
+          match_id: match_id,
+          hero_instance_id: target.hero_instance_id,
+          kind: status,
+          value: value,
+          expires_at: now + duration_ms,
+        )
+      #(target, Some(s))
+    }
+  }
+}
 
 pub fn init_team_state(match_id: String, team: Int, now: Int) -> MatchTeamState {
   MatchTeamState(

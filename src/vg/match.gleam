@@ -11,10 +11,12 @@ import vg/content
 import vg/db
 import vg/match_logic
 import vg/types.{
-  type GameMatch, type MatchCast, type MatchHandSlot, type MatchHero,
-  type MatchPlayer, type MatchStatus, type MatchTeamState, Active, Finished,
-  GameMatch, MatchCast, MatchHandSlot, MatchPlayer, MatchTeamState, NoWinner,
-  Team1, Team2, Waiting,
+  type AbilityDef, type GameMatch, type MatchCast, type MatchHandSlot,
+  type MatchHero, type MatchPlayer, type MatchStatus, type MatchTeamState,
+  type TargetPolicy, Active, EvtActionUsed, Finished, FirstAlive, GameMatch,
+  HighestHp, HighestHpPct, LowestHp, LowestHpPct, MatchCast, MatchHandSlot,
+  MatchPlayer, MatchTeamState, ModeActionLinked, NoWinner, ScopeAlly, ScopeAny,
+  ScopeSelf, Team1, Team2, Waiting,
 }
 
 // Match actor state
@@ -59,6 +61,12 @@ pub type Message {
     player_id: String,
     caster_slot: Int,
     target_slot: Int,
+    reply_to: Subject(Result(Nil, String)),
+  )
+  CastSkillMsg(
+    player_id: String,
+    caster_slot: Int,
+    ability_id: String,
     reply_to: Subject(Result(Nil, String)),
   )
 
@@ -375,6 +383,10 @@ fn handle_message(
       }
     }
 
+    CastSkillMsg(player_id, caster_slot, ability_id, reply_to) -> {
+      handle_cast_skill(state, player_id, caster_slot, ability_id, reply_to)
+    }
+
     Tick(now, reply_to) -> {
       case state.match.phase {
         Active -> {
@@ -386,9 +398,15 @@ fn handle_message(
               dict.insert(acc, team, match_logic.regen_energy(ts, now))
             })
 
-          // Resolve casts that are ready
+          // Regenerate mana for all heroes
+          let heroes_after_mana =
+            dict.fold(state.heroes, dict.new(), fn(acc, id, h) {
+              dict.insert(acc, id, match_logic.regen_hero_mana(h, now))
+            })
+
+          // Resolve casts that are ready (passives dispatched on action_used)
           let #(new_casts, new_heroes, new_statuses) =
-            resolve_casts(state.casts, state.heroes, active_statuses, now)
+            resolve_casts(state.casts, heroes_after_mana, active_statuses, now, state.match.match_id)
           let active_casts = prune_resolved_casts(new_casts)
 
           // Apply DoT/Hot ticks once per second
@@ -596,6 +614,93 @@ fn get_first_alive_hero_any(
   |> list.first()
 }
 
+/// Pick a target on `target_team` according to a hero's TargetPolicy.
+/// Returns Error(Nil) if there are no alive heroes on that team.
+fn resolve_by_policy(
+  heroes: Dict(String, MatchHero),
+  target_team: Int,
+  policy: TargetPolicy,
+) -> Result(MatchHero, Nil) {
+  let alive =
+    heroes
+    |> dict.values()
+    |> list.filter(fn(h) { h.team == target_team && h.alive })
+  case alive {
+    [] -> Error(Nil)
+    _ ->
+      case policy {
+        FirstAlive -> list.first(alive)
+        LowestHp ->
+          alive
+          |> list.sort(fn(a, b) { int.compare(a.hp_current, b.hp_current) })
+          |> list.first()
+        HighestHp ->
+          alive
+          |> list.sort(fn(a, b) { int.compare(b.hp_current, a.hp_current) })
+          |> list.first()
+        LowestHpPct ->
+          alive
+          |> list.sort(fn(a, b) {
+            int.compare(a.hp_current * b.hp_max, b.hp_current * a.hp_max)
+          })
+          |> list.first()
+        HighestHpPct ->
+          alive
+          |> list.sort(fn(a, b) {
+            int.compare(b.hp_current * a.hp_max, a.hp_current * b.hp_max)
+          })
+          |> list.first()
+      }
+  }
+}
+
+/// Look up the caster's hero def to get its target_policy. Falls back to FirstAlive.
+fn caster_policy(caster: MatchHero) -> TargetPolicy {
+  case content.get_hero_def(caster.hero_slug) {
+    Ok(def) -> def.target_policy
+    Error(_) -> FirstAlive
+  }
+}
+
+/// Build the initial hero_targets dict for a team by applying each ally's
+/// target_policy against the live enemy roster.
+fn auto_assign_targets(
+  heroes: Dict(String, MatchHero),
+  caster_team: Int,
+) -> Dict(Int, Int) {
+  let target_team = case caster_team {
+    1 -> 2
+    _ -> 1
+  }
+  heroes
+  |> dict.values()
+  |> list.filter(fn(h) { h.team == caster_team })
+  |> list.fold(dict.new(), fn(acc, ally) {
+    case resolve_by_policy(heroes, target_team, caster_policy(ally)) {
+      Ok(target) -> dict.insert(acc, ally.slot_index, target.slot_index)
+      Error(_) -> acc
+    }
+  })
+}
+
+/// Resolve an enemy target: prefer the explicit slot if it's alive, else fall back
+/// to the caster's auto-target policy.
+fn resolve_enemy_with_fallback(
+  heroes: Dict(String, MatchHero),
+  caster: MatchHero,
+  target_team: Int,
+  target_slot: Int,
+) -> Result(MatchHero, Nil) {
+  case get_hero_by_slot(heroes, target_team, target_slot) {
+    Ok(h) ->
+      case h.alive {
+        True -> Ok(h)
+        False -> resolve_by_policy(heroes, target_team, caster_policy(caster))
+      }
+    Error(_) -> resolve_by_policy(heroes, target_team, caster_policy(caster))
+  }
+}
+
 fn resolve_target(
   heroes: Dict(String, MatchHero),
   caster_team: Int,
@@ -612,8 +717,8 @@ fn resolve_target(
         1 -> 2
         _ -> 1
       }
-      // Use the client-provided target_slot instead of auto-resolving
-      get_hero_by_slot(heroes, target_team, target_slot)
+      // Prefer the client-provided slot; fall back to the caster's auto-target policy.
+      resolve_enemy_with_fallback(heroes, caster, target_team, target_slot)
     }
     types.AnySingle -> resolve_any_auto_target(heroes, caster_team, caster)
     types.AllyAuto -> Ok(caster)
@@ -622,8 +727,7 @@ fn resolve_target(
         1 -> 2
         _ -> 1
       }
-      // Use the client-provided target_slot instead of auto-resolving
-      get_hero_by_slot(heroes, target_team, target_slot)
+      resolve_enemy_with_fallback(heroes, caster, target_team, target_slot)
     }
     types.AnyAuto -> resolve_any_auto_target(heroes, caster_team, caster)
   }
@@ -715,6 +819,7 @@ fn resolve_casts(
   heroes: Dict(String, MatchHero),
   statuses: Dict(String, MatchStatus),
   now: Int,
+  match_id: String,
 ) -> #(
   Dict(String, MatchCast),
   Dict(String, MatchHero),
@@ -769,13 +874,185 @@ fn resolve_casts(
                 dict.insert(acc, s.status_id, s)
               })
 
-            #(new_casts, new_heroes, new_statuses_dict)
+            // Dispatch action_used passives for the caster's abilities
+            let #(heroes_after_passives, statuses_after_passives) =
+              dispatch_action_used_passives(
+                result.caster,
+                new_heroes,
+                new_statuses_dict,
+                match_id,
+                now,
+              )
+
+            #(new_casts, heroes_after_passives, statuses_after_passives)
           }
           _, _, _ -> #(current_casts, current_heroes, current_statuses)
         }
       }
       _, _ -> #(current_casts, current_heroes, current_statuses)
     }
+  })
+}
+
+// After the caster's action card resolves, fire its action_used passives.
+fn dispatch_action_used_passives(
+  caster: MatchHero,
+  heroes: Dict(String, MatchHero),
+  statuses: Dict(String, MatchStatus),
+  match_id: String,
+  now: Int,
+) -> #(Dict(String, MatchHero), Dict(String, MatchStatus)) {
+  let abilities = content.get_hero_abilities(caster.hero_slug)
+  let triggered =
+    list.filter(abilities, fn(a) {
+      a.activation_mode == ModeActionLinked
+      && a.activation_event == EvtActionUsed
+      && case a.actor_scope {
+        ScopeSelf -> True
+        ScopeAlly -> True
+        ScopeAny -> True
+        _ -> False
+      }
+    })
+  list.fold(triggered, #(heroes, statuses), fn(acc, ability) {
+    let #(hs, ss) = acc
+    apply_ability(ability, caster, hs, ss, match_id, now)
+  })
+}
+
+// Apply all effects of an ability to its resolved targets.
+pub fn apply_ability(
+  ability: AbilityDef,
+  caster: MatchHero,
+  heroes: Dict(String, MatchHero),
+  statuses: Dict(String, MatchStatus),
+  match_id: String,
+  now: Int,
+) -> #(Dict(String, MatchHero), Dict(String, MatchStatus)) {
+  case content.get_hero_def(caster.hero_slug) {
+    Error(_) -> #(heroes, statuses)
+    Ok(caster_def) -> {
+      let targets = match_logic.resolve_ability_targets(ability, caster, heroes)
+      list.fold(ability.effects, #(heroes, statuses), fn(acc, effect) {
+        let #(hs, ss) = acc
+        list.fold(targets, #(hs, ss), fn(inner_acc, t) {
+          let #(ihs, iss) = inner_acc
+          // Refresh the target snapshot with any prior effects this ability applied
+          let live_target = case dict.get(ihs, t.hero_instance_id) {
+            Ok(h) -> h
+            Error(_) -> t
+          }
+          case content.get_hero_def(live_target.hero_slug) {
+            Error(_) -> inner_acc
+            Ok(target_def) -> {
+              let #(updated_target, maybe_status) =
+                match_logic.apply_ability_effect(
+                  effect,
+                  caster_def,
+                  live_target,
+                  target_def,
+                  match_id,
+                  now,
+                )
+              let new_hs =
+                dict.insert(ihs, updated_target.hero_instance_id, updated_target)
+              let new_ss = case maybe_status {
+                Some(s) -> dict.insert(iss, s.status_id, s)
+                None -> iss
+              }
+              #(new_hs, new_ss)
+            }
+          }
+        })
+      })
+    }
+  }
+}
+
+fn handle_cast_skill(
+  state: MatchActorState,
+  player_id: String,
+  caster_slot: Int,
+  ability_id: String,
+  reply_to: Subject(Result(Nil, String)),
+) -> actor.Next(MatchActorState, Message) {
+  case state.match.phase {
+    Active -> {
+      case get_player_team(state, player_id) {
+        Ok(team) -> {
+          case get_hero_by_slot(state.heroes, team, caster_slot) {
+            Ok(caster) -> {
+              case content.get_hero_ability(caster.hero_slug, ability_id) {
+                Ok(ability) -> {
+                  let now = get_timestamp()
+                  let caster_regen = match_logic.regen_hero_mana(caster, now)
+                  case match_logic.can_spend_mana(caster_regen, ability.mana_cost) {
+                    True -> {
+                      let caster_after_spend =
+                        match_logic.spend_mana(caster_regen, ability.mana_cost)
+                      let heroes_with_caster =
+                        dict.insert(
+                          state.heroes,
+                          caster_after_spend.hero_instance_id,
+                          caster_after_spend,
+                        )
+                      let #(new_heroes, new_statuses) =
+                        apply_ability(
+                          ability,
+                          caster_after_spend,
+                          heroes_with_caster,
+                          state.statuses,
+                          state.match.match_id,
+                          now,
+                        )
+                      process.send(reply_to, Ok(Nil))
+                      actor.continue(
+                        MatchActorState(
+                          ..state,
+                          heroes: new_heroes,
+                          statuses: new_statuses,
+                        ),
+                      )
+                    }
+                    False -> {
+                      process.send(reply_to, Error("Not enough mana"))
+                      actor.continue(state)
+                    }
+                  }
+                }
+                Error(_) -> {
+                  process.send(reply_to, Error("Unknown ability"))
+                  actor.continue(state)
+                }
+              }
+            }
+            Error(_) -> {
+              process.send(reply_to, Error("Invalid caster"))
+              actor.continue(state)
+            }
+          }
+        }
+        Error(_) -> {
+          process.send(reply_to, Error("Player not in match"))
+          actor.continue(state)
+        }
+      }
+    }
+    _ -> {
+      process.send(reply_to, Error("Match not active"))
+      actor.continue(state)
+    }
+  }
+}
+
+pub fn cast_skill(
+  match_actor: Subject(Message),
+  player_id: String,
+  caster_slot: Int,
+  ability_id: String,
+) -> Result(Nil, String) {
+  process.call(match_actor, waiting: 5000, sending: fn(subject) {
+    CastSkillMsg(player_id, caster_slot, ability_id, subject)
   })
 }
 
@@ -925,11 +1202,6 @@ fn handle_start_match(
             match_logic.init_team_state(state.match.match_id, 1, now)
           let team2_state =
             match_logic.init_team_state(state.match.match_id, 2, now)
-          let new_team_states =
-            dict.from_list([
-              #(1, team1_state),
-              #(2, team2_state),
-            ])
 
           // Spawn heroes for both teams using provided hero slugs
           let team1_heroes =
@@ -948,6 +1220,20 @@ fn handle_start_match(
             )
           let all_heroes =
             dict.from_list(list.append(team1_heroes, team2_heroes))
+
+          // Auto-assign hero_targets per ally based on its target_policy.
+          let team1_state =
+            MatchTeamState(
+              ..team1_state,
+              hero_targets: auto_assign_targets(all_heroes, 1),
+            )
+          let team2_state =
+            MatchTeamState(
+              ..team2_state,
+              hero_targets: auto_assign_targets(all_heroes, 2),
+            )
+          let new_team_states =
+            dict.from_list([#(1, team1_state), #(2, team2_state)])
 
           // Roll initial hands for both teams
           let hand1 = roll_hand_for_team(state.match.match_id, 1)

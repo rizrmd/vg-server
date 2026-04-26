@@ -13,7 +13,7 @@ import vg/connection_registry
 import vg/db
 import vg/game_json.{
   type ClientMessage, type ServerMessage, Authenticate, AuthError,
-  Authenticated, CastAction, ChangeTrainingEnemies, CompleteFtue,
+  Authenticated, CastAction, CastSkill, ChangeTrainingEnemies, CompleteFtue,
   Connected, Error as ServerError, FtueCompletedAck, GetLeaderboard,
   GetMatchHistory, GetMatchState, GetPlayerStats, Leaderboard, LeaveMatch,
   MatchFound, MatchHistory, MatchmakingLeft, MatchmakingQueued, PlayerStatsResponse,
@@ -414,6 +414,48 @@ fn handle_authenticated_message(
                 }
                 Error(err) -> {
                   send_server_message(conn, ServerError("CAST_ERROR", err))
+                  mist.continue(state)
+                }
+              }
+            }
+            Error(_) -> {
+              send_server_message(
+                conn,
+                ServerError("MATCH_NOT_FOUND", "Match not found"),
+              )
+              mist.continue(state)
+            }
+          }
+        }
+        _ -> {
+          send_server_message(
+            conn,
+            ServerError("NOT_IN_MATCH", "You are not in this match"),
+          )
+          mist.continue(state)
+        }
+      }
+    }
+
+    CastSkill(match_id, caster_slot, ability_id) -> {
+      case state.current_match_id {
+        Some(current_id) if current_id == match_id -> {
+          case match_registry.get_match(state.match_registry, match_id) {
+            Ok(match_actor) -> {
+              case
+                match.cast_skill(
+                  match_actor,
+                  state.player_id,
+                  caster_slot,
+                  ability_id,
+                )
+              {
+                Ok(Nil) -> {
+                  send_match_state(conn, match_actor, state)
+                  mist.continue(state)
+                }
+                Error(err) -> {
+                  send_server_message(conn, ServerError("SKILL_ERROR", err))
                   mist.continue(state)
                 }
               }

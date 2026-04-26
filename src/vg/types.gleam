@@ -157,6 +157,14 @@ pub fn status_kind_from_string(s: String) -> Result(StatusKind, Nil) {
 // Static content definitions
 // ============================================================================
 
+pub type TargetPolicy {
+  FirstAlive
+  LowestHp
+  HighestHp
+  LowestHpPct
+  HighestHpPct
+}
+
 pub type HeroDef {
   HeroDef(
     slug: String,
@@ -170,6 +178,7 @@ pub type HeroDef {
     wind_affinity: Int,
     light_affinity: Int,
     shadow_affinity: Int,
+    target_policy: TargetPolicy,
   )
 }
 
@@ -293,7 +302,88 @@ pub type MatchHero {
     hp_max: Int,
     alive: Bool,
     busy_until: Int, // timestamp when no longer busy
+    mana_current: Int,
+    mana_max: Int,
+    last_mana_at: Int,
   )
+}
+
+// ============================================================================
+// Hero Abilities
+// ============================================================================
+
+pub type AbilityRole {
+  RoleSkill
+  RolePassive
+  RoleReaction
+  RoleUltimate
+}
+
+pub type AbilityActivationMode {
+  ModeManual
+  ModeAutoTime
+  ModeAutoInterval
+  ModeReactive
+  ModeActionLinked
+  ModeChargeRelease
+}
+
+pub type AbilityEvent {
+  EvtActionUsed
+  EvtDamageTaken
+  EvtAttacked
+  EvtSkillUsed
+  EvtAllyDied
+  EvtNone
+}
+
+pub type AbilityActorScope {
+  ScopeSelf
+  ScopeAlly
+  ScopeEnemy
+  ScopeAny
+}
+
+pub type AbilityTarget {
+  TgtSelf
+  TgtPrimary
+  TgtAttacker
+  TgtAllAllies
+  TgtAllEnemies
+  TgtLowestHpAlly
+  TgtRandomEnemy
+}
+
+pub type AbilityEffect {
+  EffHeal(base_power: Int)
+  EffDamage(base_power: Int)
+  EffApplyStatus(status: StatusKind, duration_ms: Int, value: Int)
+}
+
+pub type AbilityDef {
+  AbilityDef(
+    id: String,
+    hero_slug: String,
+    name: String,
+    role: AbilityRole,
+    target: AbilityTarget,
+    mana_cost: Int,
+    activation_mode: AbilityActivationMode,
+    activation_event: AbilityEvent,
+    actor_scope: AbilityActorScope,
+    cooldown_ms: Int,
+    effects: List(AbilityEffect),
+    thought: String,
+  )
+}
+
+pub fn ability_role_to_string(r: AbilityRole) -> String {
+  case r {
+    RoleSkill -> "skill"
+    RolePassive -> "passive"
+    RoleReaction -> "reaction"
+    RoleUltimate -> "ultimate"
+  }
 }
 
 pub type MatchHandSlot {

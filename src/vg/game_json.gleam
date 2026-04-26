@@ -26,6 +26,7 @@ pub type ClientMessage {
     hero_slug_3: String,
   )
   CastAction(match_id: String, caster_slot: Int, hand_slot_index: Int, target_slot: Int)
+  CastSkill(match_id: String, caster_slot: Int, ability_id: String)
   SetHeroTarget(match_id: String, caster_slot: Int, target_slot: Int)
   RerollHand(match_id: String)
   LeaveMatch(match_id: String)
@@ -265,6 +266,9 @@ fn encode_match_hero(h: MatchHero) -> json.Json {
     #("hp_max", json.int(h.hp_max)),
     #("alive", json.bool(h.alive)),
     #("busy_until", json.int(h.busy_until)),
+    #("mana_current", json.int(h.mana_current)),
+    #("mana_max", json.int(h.mana_max)),
+    #("last_mana_at", json.int(h.last_mana_at)),
   ])
 }
 
