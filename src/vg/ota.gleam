@@ -62,11 +62,21 @@ fn handle_message(state: State, msg: Message) -> actor.Next(State, Message) {
 }
 
 pub fn get_manifest(sub: Subject(Message)) -> Option(String) {
-  process.call(sub, GetManifest(_), 5000)
+  let reply_with = process.new_subject()
+  process.send(sub, GetManifest(reply_with))
+  case process.receive(reply_with, 5000) {
+    Ok(val) -> val
+    Error(_) -> None
+  }
 }
 
 pub fn set_manifest(sub: Subject(Message), json: String) -> Result(Nil, String) {
-  process.call(sub, SetManifest(json, _), 5000)
+  let reply_with = process.new_subject()
+  process.send(sub, SetManifest(json, reply_with))
+  case process.receive(reply_with, 5000) {
+    Ok(result) -> result
+    Error(_) -> Error("timeout")
+  }
 }
 
 @external(erlang, "vg_server_ffi", "read_file")
