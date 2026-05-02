@@ -15,6 +15,8 @@ import vg/db
 import vg/match_orchestrator
 import vg/match_registry
 import vg/matchmaking
+import vg/ota
+import vg/ota_http
 import vg/player_registry
 import vg/websocket
 
@@ -120,6 +122,9 @@ fn run_server(
   conn_registry: process.Subject(connection_registry.Message),
   db_conn: Result(pog.Connection, Nil),
 ) {
+  let assert Ok(actor.Started(pid: _, data: ota_sub)) = ota.start()
+  io.println("OTA registry started")
+
   let assert Ok(actor.Started(pid: _, data: orchestrator)) =
     match_orchestrator.start(matchmaking_queue, match_registry, conn_registry)
   io.println("Match orchestrator started")
@@ -146,6 +151,7 @@ fn run_server(
     Error(_) -> default_port
   }
   let google_client_id = get_env("GOOGLE_CLIENT_ID", "")
+  let ota_secret = get_env("OTA_SECRET", "")
   let assert Ok(_) =
     start_http_server(
       player_registry,
@@ -155,6 +161,8 @@ fn run_server(
       opt_conn,
       server_port,
       google_client_id,
+      ota_sub,
+      ota_secret,
     )
   io.println(
     "WebSocket server listening on port " <> int.to_string(server_port),
@@ -185,6 +193,8 @@ fn start_http_server(
   db_conn: Option(pog.Connection),
   port: Int,
   google_client_id: String,
+  ota_sub: process.Subject(ota.Message),
+  ota_secret: String,
 ) {
   let handler = fn(req: Request(Connection)) -> Response(ResponseData) {
     case request.path_segments(req) {
@@ -225,6 +235,11 @@ fn start_http_server(
         )
         |> response.set_header("content-type", "text/html")
       }
+      ["ota", "manifest.json"] -> ota_http.handle_manifest(ota_sub)
+      ["ota", "pck", filename] -> ota_http.handle_pck_get(filename)
+      ["ota", "publish"] -> ota_http.handle_publish(req, ota_sub, ota_secret)
+      ["ota", "pck", "upload", filename] ->
+        ota_http.handle_pck_upload(req, filename, ota_secret)
       _ -> {
         response.new(200)
         |> response.set_body(mist.Bytes(bytes_tree.from_string("VG Server: Online")))

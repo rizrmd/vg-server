@@ -24,12 +24,19 @@ WORKDIR /app
 # Copy the erlang shipment
 COPY --from=builder /app/build/erlang-shipment/ ./
 
+# Create OTA storage directories (override with a volume for persistence)
+RUN mkdir -p /app/ota/pck
+
 # Set environment variables
 ENV PORT=3000
 ENV DATABASE_URL=""
+ENV OTA_SECRET=""
 
 # Expose the WebSocket port
 EXPOSE 3000
+
+# OTA files (manifest.json + pck/*.pck) live here — mount a volume for persistence
+VOLUME ["/app/ota"]
 
 # Run the server using the shipment entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
