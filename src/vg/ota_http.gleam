@@ -48,7 +48,7 @@ pub fn handle_pck_get(filename: String) -> Response(ResponseData) {
             Ok(data) ->
               response.new(200)
               |> response.set_body(
-                mist.Bytes(bytes_tree.new() |> bytes_tree.append_bit_array(data)),
+                mist.Bytes(bytes_tree.from_bit_array(data)),
               )
               |> response.set_header("content-type", "application/octet-stream")
               |> response.set_header(
