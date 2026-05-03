@@ -33,7 +33,9 @@ pub fn handle_manifest(
 // Route: GET /ota/pck/{filename}
 pub fn handle_pck_get(filename: String) -> Response(ResponseData) {
   let safe = sanitize_filename(filename)
-  case string.ends_with(safe, ".pck") {
+  let valid_ext =
+    string.ends_with(safe, ".pck") || string.ends_with(safe, ".pck.gz")
+  case valid_ext {
     False ->
       response.new(400)
       |> response.set_body(mist.Bytes(bytes_tree.from_string("Bad filename")))
@@ -136,18 +138,21 @@ pub fn handle_pck_upload(
         False -> unauthorized()
         True -> {
           let safe = sanitize_filename(filename)
-          case string.ends_with(safe, ".pck") {
+          let valid_ext =
+            string.ends_with(safe, ".pck")
+            || string.ends_with(safe, ".pck.gz")
+          case valid_ext {
             False ->
               response.new(400)
               |> response.set_body(
                 mist.Bytes(
-                  bytes_tree.from_string("{\"error\":\"filename must end with .pck\"}"),
+                  bytes_tree.from_string("{\"error\":\"filename must end with .pck or .pck.gz\"}"),
                 ),
               )
               |> response.set_header("content-type", "application/json")
             True ->
-              case mist.read_body(req, 200_000_000) {
-                // 200 MB
+              case mist.read_body(req, 1_000_000_000) {
+                // 1 GB
                 Ok(r) -> {
                   let path = ota.pck_dir <> "/" <> safe
                   case ota.ensure_dir(ota.pck_dir) {
